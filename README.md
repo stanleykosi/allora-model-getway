@@ -1,0 +1,48 @@
+# Allora Model Context Protocol (MCP) Server
+
+## Project Description
+To accelerate the adoption and simplify the participation of Data Scientists (Workers) on the Allora Network. This project will deliver a production-grade, API-first MCP server that abstracts the complexities of blockchain interaction. It will act as a managed "Model-to-Chain" gateway, handling wallet management, automated fee payment, transaction signing, and performance monitoring, allowing data scientists to focus solely on their ML models.
+
+## Getting Started
+
+Follow the setup instructions to get a local copy up and running.
+
+### Prerequisites
+
+*   Node.js (v18 or higher recommended)
+*   Docker (for PostgreSQL and Redis)
+*   `allorad` CLI tool installed and in PATH. Follow instructions from the [official Allora documentation](https://docs.allora.network/devs/get-started/cli).
+
+### Installation
+
+1.  Clone the repository:
+    ```sh
+    git clone <repository-url>
+    cd allora-mcp-server
+    ```
+2.  Install NPM packages:
+    ```sh
+    npm install
+    ```
+3.  Set up local environment variables:
+    ```sh
+    cp .env.example .env.local
+    ```
+    You will then need to populate `.env.local` with your local configuration for the database, Redis, etc.
+
+### Running the Application (Development)
+
+```sh
+npm run start
+```
+
+### Building for Production
+
+```sh
+npm run build```
+
+### Running in Production
+
+```sh
+npm run serve
+```
