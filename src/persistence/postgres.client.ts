@@ -36,6 +36,14 @@ import logger from '@/utils/logger';
  */
 const pool = new Pool({
   connectionString: config.DATABASE_URL,
+  // Add SSL configuration for Supabase
+  ssl: {
+    rejectUnauthorized: false
+  },
+  // Add connection timeout
+  connectionTimeoutMillis: 10000,
+  // Add query timeout
+  statement_timeout: 10000
 });
 
 /**
@@ -68,7 +76,7 @@ pool.on('error', (err) => {
  * understanding the connection lifecycle.
  */
 pool.on('remove', () => {
-    logger.info('Database client removed from pool.');
+  logger.info('Database client removed from pool.');
 });
 
 

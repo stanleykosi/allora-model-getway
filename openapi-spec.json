@@ -1,0 +1,315 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Allora HTTP Server API",
+    "description": "API for managing Allora network models, predictions, and wallet management",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Allora HTTP Server"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://1479d03c6901.ngrok-free.app",
+      "description": "Production server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "schemas": {
+      "Topic": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Topic ID"
+          },
+          "epochLength": {
+            "type": "integer",
+            "description": "Epoch length in blocks"
+          },
+          "creator": {
+            "type": "string",
+            "description": "Topic creator address"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether topic is active"
+          },
+          "metadata": {
+            "type": "string",
+            "description": "Topic name/description"
+          }
+        }
+      },
+      "Model": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "topicId": {
+            "type": "string"
+          },
+          "modelType": {
+            "type": "string",
+            "enum": [
+              "inference",
+              "forecaster",
+              "reputer"
+            ]
+          },
+          "webhookUrl": {
+            "type": "string"
+          },
+          "gasPriceLimit": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/predictions/topics": {
+      "get": {
+        "summary": "Get all active topics",
+        "description": "Retrieve all active topics available for model registration",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of active topics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "topics": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Topic"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/models": {
+      "post": {
+        "summary": "Register a new model",
+        "description": "Register a new model for a specific topic",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "topicId",
+                  "modelType",
+                  "webhookUrl"
+                ],
+                "properties": {
+                  "topicId": {
+                    "type": "string",
+                    "description": "Topic ID to register for"
+                  },
+                  "modelType": {
+                    "type": "string",
+                    "enum": [
+                      "inference",
+                      "forecaster",
+                      "reputer"
+                    ],
+                    "description": "Type of model"
+                  },
+                  "webhookUrl": {
+                    "type": "string",
+                    "description": "Webhook URL for inference submissions"
+                  },
+                  "gasPriceLimit": {
+                    "type": "string",
+                    "description": "Gas price limit for transactions"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Model registered successfully"
+          },
+          "400": {
+            "description": "Invalid request data"
+          }
+        }
+      }
+    },
+    "/api/v1/models/{modelId}/activate": {
+      "put": {
+        "summary": "Activate a model",
+        "description": "Activate a previously registered model",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model activated successfully"
+          },
+          "404": {
+            "description": "Model not found"
+          }
+        }
+      }
+    },
+    "/api/v1/models/{modelId}/deactivate": {
+      "put": {
+        "summary": "Deactivate a model",
+        "description": "Deactivate a previously registered model",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model deactivated successfully"
+          },
+          "404": {
+            "description": "Model not found"
+          }
+        }
+      }
+    },
+    "/api/v1/users/wallet-phrases": {
+      "get": {
+        "summary": "Get user wallet phrases",
+        "description": "Retrieve wallet mnemonic phrases for all user models",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Wallet phrases retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "wallets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "modelId": {
+                            "type": "string"
+                          },
+                          "topicId": {
+                            "type": "string"
+                          },
+                          "mnemonic": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "post": {
+        "summary": "Register a new user",
+        "description": "Create a new user account",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "username",
+                  "email"
+                ],
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully"
+          },
+          "400": {
+            "description": "Invalid request data"
+          }
+        }
+      }
+    }
+  }
+}

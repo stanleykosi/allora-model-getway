@@ -11,7 +11,7 @@
 
 import { Router } from 'express';
 import { apiKeyAuth } from '@/api/v1/middleware/auth.middleware';
-import { registerUserHandler, getUserProfileHandler } from './users.controller';
+import { registerUserHandler, getUserProfileHandler, getUserWalletPhraseHandler } from './users.controller';
 
 const router = Router();
 
@@ -43,6 +43,23 @@ router.get(
   '/profile',
   apiKeyAuth,
   getUserProfileHandler
+);
+
+/**
+ * @route GET /api/v1/users/wallet-phrases
+ * @description Route for retrieving the current user's wallet mnemonic phrases.
+ * @access Protected
+ *
+ * @middleware
+ * - `apiKeyAuth`: Ensures that only authenticated users can access this endpoint.
+ *
+ * @handler
+ * - `getUserWalletPhraseHandler`: The controller function that processes the request.
+ */
+router.get(
+  '/wallet-phrases',
+  apiKeyAuth,
+  getUserWalletPhraseHandler
 );
 
 export default router; 

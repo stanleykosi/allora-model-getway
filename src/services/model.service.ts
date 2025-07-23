@@ -182,6 +182,60 @@ class ModelService {
       logger.fatal({ err: cleanupError, walletId: wallet.id }, 'CRITICAL: Failed to cleanup resources after a failed registration. Manual intervention required.');
     }
   }
+
+  /**
+   * Retrieves all models for a specific user.
+   * @param userId The ID of the user.
+   * @returns A promise resolving to an array of models or null if error.
+   */
+  public async getModelsByUserId(userId: string): Promise<any[] | null> {
+    const log = logger.child({ service: 'ModelService', method: 'getModelsByUserId', userId });
+
+    try {
+      const query = `
+        SELECT id, user_id, wallet_id, webhook_url, topic_id, model_type, max_gas_price, is_active, created_at, updated_at
+        FROM models
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+      `;
+      const result = await pool.query(query, [userId]);
+
+      log.info({ userId, modelCount: result.rows.length }, 'Successfully retrieved user models from database.');
+      return result.rows;
+    } catch (error) {
+      log.error({ err: error, userId }, 'An error occurred while retrieving user models from database.');
+      return null;
+    }
+  }
+
+  /**
+   * Retrieves a specific model by its ID.
+   * @param modelId The ID of the model.
+   * @returns A promise resolving to the model or null if not found.
+   */
+  public async getModelById(modelId: string): Promise<any | null> {
+    const log = logger.child({ service: 'ModelService', method: 'getModelById', modelId });
+
+    try {
+      const query = `
+        SELECT id, user_id, wallet_id, webhook_url, topic_id, model_type, max_gas_price, is_active, created_at, updated_at
+        FROM models
+        WHERE id = $1
+      `;
+      const result = await pool.query(query, [modelId]);
+
+      if (result.rows.length === 0) {
+        log.warn({ modelId }, 'Model not found in database.');
+        return null;
+      }
+
+      log.info({ modelId }, 'Successfully retrieved model from database.');
+      return result.rows[0];
+    } catch (error) {
+      log.error({ err: error, modelId }, 'An error occurred while retrieving model from database.');
+      return null;
+    }
+  }
 }
 
 

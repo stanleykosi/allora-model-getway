@@ -1,6 +1,6 @@
 /**
  * @description
- * This is the main entry point for the Allora MCP Server application.
+ * This is the main entry point for the Allora HTTP Server application.
  * Its primary responsibilities are to initialize the environment,
  * start the Express server, and handle graceful shutdown signals.
  *
@@ -16,7 +16,7 @@
  * - @/core/scheduler/performance.scheduler: The scheduler for performance monitoring jobs.
  */
 
-import { config } from './config'; // Must be the first import
+import { config } from '@/config'; // Must be the first import
 import app from './api/server';
 import logger from './utils/logger';
 import inferenceScheduler from './core/scheduler/inference.scheduler';

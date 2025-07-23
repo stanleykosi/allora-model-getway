@@ -114,6 +114,36 @@ class WalletService {
       return null;
     }
   }
+
+  /**
+   * Retrieves a wallet by its ID from the database.
+   * @param walletId The ID of the wallet to retrieve.
+   * @returns A promise resolving to the wallet or null if not found.
+   */
+  public async getWalletById(walletId: string): Promise<Wallet | null> {
+    const log = logger.child({ service: 'WalletService', method: 'getWalletById', walletId });
+
+    try {
+      const query = `
+        SELECT id, address, secret_ref, created_at, updated_at
+        FROM wallets
+        WHERE id = $1
+      `;
+      const result = await pool.query<Wallet>(query, [walletId]);
+
+      if (result.rows.length === 0) {
+        log.warn({ walletId }, 'Wallet not found in database.');
+        return null;
+      }
+
+      const wallet = result.rows[0];
+      log.info({ walletId, address: wallet.address }, 'Successfully retrieved wallet from database.');
+      return wallet;
+    } catch (error) {
+      log.error({ err: error, walletId }, 'An error occurred while retrieving wallet from database.');
+      return null;
+    }
+  }
 }
 
 /**

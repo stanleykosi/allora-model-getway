@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- It's good practice to add comments to tables and columns for future reference.
-COMMENT ON TABLE users IS 'Stores information about the Data Scientists who use the MCP server.';
+COMMENT ON TABLE users IS 'Stores information about the Data Scientists who use the HTTP server.';
 COMMENT ON COLUMN users.id IS 'Unique identifier for the user (UUID).';
 COMMENT ON COLUMN users.email IS 'User''s unique email address.';
 COMMENT ON COLUMN users.api_key_hash IS 'Hashed API key for authentication.';

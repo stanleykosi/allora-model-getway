@@ -12,7 +12,7 @@
 
 import { Router } from 'express';
 import { apiKeyAuth } from '@/api/v1/middleware/auth.middleware';
-import { registerModelHandler, getModelPerformanceHandler, debugAlloradHandler, debugPerformanceHandler } from './models.controller';
+import { registerModelHandler, getModelPerformanceHandler, debugAlloradHandler, debugPerformanceHandler, deactivateModelHandler, activateModelHandler } from './models.controller';
 
 const router = Router();
 
@@ -73,6 +73,40 @@ router.post(
   '/:modelId/debug-performance',
   apiKeyAuth,
   debugPerformanceHandler
+);
+
+/**
+ * @route PUT /api/v1/models/:modelId/deactivate
+ * @description Route for deactivating a user's model.
+ * @access Protected
+ *
+ * @middleware
+ * - `apiKeyAuth`: Ensures that only authenticated users can access this endpoint.
+ *
+ * @handler
+ * - `deactivateModelHandler`: The controller function that processes the request.
+ */
+router.put(
+  '/:modelId/deactivate',
+  apiKeyAuth,
+  deactivateModelHandler
+);
+
+/**
+ * @route PUT /api/v1/models/:modelId/activate
+ * @description Route for activating a user's model.
+ * @access Protected
+ *
+ * @middleware
+ * - `apiKeyAuth`: Ensures that only authenticated users can access this endpoint.
+ *
+ * @handler
+ * - `activateModelHandler`: The controller function that processes the request.
+ */
+router.put(
+  '/:modelId/activate',
+  apiKeyAuth,
+  activateModelHandler
 );
 
 export default router; 

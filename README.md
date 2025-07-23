@@ -1,7 +1,7 @@
-# Allora Model Context Protocol (MCP) Server
+# Allora HTTP Server
 
 ## Project Description
-To accelerate the adoption and simplify the participation of Data Scientists (Workers) on the Allora Network. This project will deliver a production-grade, API-first MCP server that abstracts the complexities of blockchain interaction. It will act as a managed "Model-to-Chain" gateway, handling wallet management, automated fee payment, transaction signing, and performance monitoring, allowing data scientists to focus solely on their ML models.
+To accelerate the adoption and simplify the participation of Data Scientists (Workers) on the Allora Network. This project delivers a production-grade, API-first HTTP server that abstracts the complexities of blockchain interaction. It acts as a managed "Model-to-Chain" gateway, handling wallet management, automated fee payment, transaction signing, and performance monitoring, allowing data scientists to focus solely on their ML models.
 
 ## Getting Started
 
@@ -18,7 +18,7 @@ Follow the setup instructions to get a local copy up and running.
 1.  Clone the repository:
     ```sh
     git clone <repository-url>
-    cd allora-mcp-server
+    cd allora-http-server
     ```
 2.  Install NPM packages:
     ```sh

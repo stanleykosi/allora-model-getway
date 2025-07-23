@@ -79,7 +79,7 @@ export type ExecResult = [string | null, Error | null];
 /**
  * @interface TopicDetails
  * @description A consolidated and cleaned-up data structure representing the essential
- * details of a topic required by the MCP server. This is the primary object
+ * details of a topic required by the HTTP server. This is the primary object
  * returned by the connector service's `getTopicDetails` method.
  */
 export interface TopicDetails {
@@ -87,6 +87,7 @@ export interface TopicDetails {
   epochLength: number;
   isActive: boolean;
   creator: string;
+  metadata: string;
 }
 
 /**

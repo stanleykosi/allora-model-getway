@@ -22,6 +22,7 @@ import pinoHttp from 'pino-http';
 import logger from '@/utils/logger';
 import modelRoutes from '@/api/v1/models/models.routes';
 import userRoutes from '@/api/v1/users/users.routes';
+import predictionRoutes from '@/api/v1/predictions/predictions.routes';
 
 // Create the Express application instance.
 const app: Express = express();
@@ -58,6 +59,9 @@ app.use('/api/v1/models', modelRoutes);
 
 // Wire up the versioned API routes for the 'users' resource.
 app.use('/api/v1/users', userRoutes);
+
+// Wire up the versioned API routes for the 'predictions' resource.
+app.use('/api/v1/predictions', predictionRoutes);
 
 
 export default app; 

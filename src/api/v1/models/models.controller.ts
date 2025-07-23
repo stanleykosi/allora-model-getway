@@ -15,6 +15,7 @@
 
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import * as yaml from 'js-yaml';
 import modelService, { ModelRegistrationData } from '@/services/model.service';
 import performanceService from '@/services/performance.service';
 import logger from '@/utils/logger';
@@ -195,28 +196,12 @@ export const debugAlloradHandler = async (req: Request, res: Response) => {
     const isActiveData = JSON.parse(isActiveResult.stdout);
     const isActive = typeof isActiveData === 'boolean' ? isActiveData : isActiveData.active;
 
-    const topicLines = getTopicResult.stdout.split('\n');
-    let topicId = '';
-    let epochLength = 0;
-    let creator = '';
-    let inTopicSection = false;
-
-    for (const line of topicLines) {
-      if (line.includes('topic:')) {
-        inTopicSection = true;
-        continue;
-      }
-
-      if (inTopicSection) {
-        if (line.includes('id:')) {
-          topicId = line.split('id:')[1].trim().replace(/"/g, '');
-        } else if (line.includes('epoch_length:')) {
-          epochLength = parseInt(line.split('epoch_length:')[1].trim().replace(/"/g, ''), 10);
-        } else if (line.includes('creator:')) {
-          creator = line.split('creator:')[1].trim();
-        }
-      }
-    }
+    // Parse YAML using proper YAML parser
+    const topicData = yaml.load(getTopicResult.stdout) as any;
+    const topic = topicData.topic;
+    const topicId = topic?.id;
+    const epochLength = parseInt(topic?.epoch_length || '0', 10);
+    const creator = topic?.creator;
 
     log.info({
       isActiveStdout: isActiveResult.stdout,
@@ -298,5 +283,155 @@ export const debugPerformanceHandler = async (req: Request, res: Response) => {
   } catch (error: any) {
     log.error({ err: error }, 'Debug performance collection failed');
     return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * @controller deactivateModelHandler
+ * @description Handles the request to deactivate a user's model.
+ * This prevents the model from being processed by schedulers.
+ *
+ * @security
+ * - Requires API key authentication
+ * - Only allows users to deactivate their own models
+ * - Logs the action for audit purposes
+ *
+ * @param req The Express Request object.
+ * @param res The Express Response object.
+ */
+export const deactivateModelHandler = async (req: Request, res: Response) => {
+  const log = logger.child({ controller: 'deactivateModelHandler', userId: req.user?.id });
+
+  try {
+    // Step 1: Ensure user is authenticated
+    if (!req.user?.id) {
+      log.warn('FATAL: deactivateModelHandler reached without an authenticated user. Check middleware order.');
+      return res.status(401).json({ error: 'User not authenticated.' });
+    }
+    const userId = req.user.id;
+    const { modelId } = req.params;
+
+    // Step 2: Verify the model belongs to the user
+    const modelQuery = `
+      SELECT id, topic_id, model_type, is_active, created_at
+      FROM models
+      WHERE id = $1 AND user_id = $2
+    `;
+    const modelResult = await pool.query(modelQuery, [modelId, userId]);
+
+    if (modelResult.rows.length === 0) {
+      log.warn({ userId, modelId }, 'Model not found or does not belong to user.');
+      return res.status(404).json({ error: 'Model not found or access denied.' });
+    }
+
+    const model = modelResult.rows[0];
+
+    if (!model.is_active) {
+      log.info({ userId, modelId }, 'Model is already deactivated.');
+      return res.status(200).json({
+        message: 'Model is already deactivated.',
+        model: {
+          id: model.id,
+          topic_id: model.topic_id,
+          model_type: model.model_type,
+          is_active: false
+        }
+      });
+    }
+
+    // Step 3: Deactivate the model
+    const deactivateQuery = `
+      UPDATE models 
+      SET is_active = false, updated_at = NOW() 
+      WHERE id = $1 AND user_id = $2
+      RETURNING id, topic_id, model_type, is_active, updated_at
+    `;
+    const deactivateResult = await pool.query(deactivateQuery, [modelId, userId]);
+
+    log.info({ userId, modelId, topicId: model.topic_id }, 'Model deactivated successfully.');
+
+    return res.status(200).json({
+      message: 'Model deactivated successfully.',
+      model: deactivateResult.rows[0]
+    });
+
+  } catch (error) {
+    log.error({ err: error }, 'An unexpected error occurred in deactivateModelHandler.');
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+/**
+ * @controller activateModelHandler
+ * @description Handles the request to activate a user's model.
+ * This allows the model to be processed by schedulers again.
+ *
+ * @security
+ * - Requires API key authentication
+ * - Only allows users to activate their own models
+ * - Logs the action for audit purposes
+ *
+ * @param req The Express Request object.
+ * @param res The Express Response object.
+ */
+export const activateModelHandler = async (req: Request, res: Response) => {
+  const log = logger.child({ controller: 'activateModelHandler', userId: req.user?.id });
+
+  try {
+    // Step 1: Ensure user is authenticated
+    if (!req.user?.id) {
+      log.warn('FATAL: activateModelHandler reached without an authenticated user. Check middleware order.');
+      return res.status(401).json({ error: 'User not authenticated.' });
+    }
+    const userId = req.user.id;
+    const { modelId } = req.params;
+
+    // Step 2: Verify the model belongs to the user
+    const modelQuery = `
+      SELECT id, topic_id, model_type, is_active, created_at
+      FROM models
+      WHERE id = $1 AND user_id = $2
+    `;
+    const modelResult = await pool.query(modelQuery, [modelId, userId]);
+
+    if (modelResult.rows.length === 0) {
+      log.warn({ userId, modelId }, 'Model not found or does not belong to user.');
+      return res.status(404).json({ error: 'Model not found or access denied.' });
+    }
+
+    const model = modelResult.rows[0];
+
+    if (model.is_active) {
+      log.info({ userId, modelId }, 'Model is already active.');
+      return res.status(200).json({
+        message: 'Model is already active.',
+        model: {
+          id: model.id,
+          topic_id: model.topic_id,
+          model_type: model.model_type,
+          is_active: true
+        }
+      });
+    }
+
+    // Step 3: Activate the model
+    const activateQuery = `
+      UPDATE models 
+      SET is_active = true, updated_at = NOW() 
+      WHERE id = $1 AND user_id = $2
+      RETURNING id, topic_id, model_type, is_active, updated_at
+    `;
+    const activateResult = await pool.query(activateQuery, [modelId, userId]);
+
+    log.info({ userId, modelId, topicId: model.topic_id }, 'Model activated successfully.');
+
+    return res.status(200).json({
+      message: 'Model activated successfully.',
+      model: activateResult.rows[0]
+    });
+
+  } catch (error) {
+    log.error({ err: error }, 'An unexpected error occurred in activateModelHandler.');
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 }; 

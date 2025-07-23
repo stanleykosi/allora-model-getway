@@ -30,6 +30,7 @@ import {
   defaultRegistryTypes
 } from '@cosmjs/stargate';
 import { DirectSecp256k1HdWallet, Registry, EncodeObject } from '@cosmjs/proto-signing';
+import * as yaml from 'js-yaml';
 import { config } from '@/config';
 import logger from '@/utils/logger';
 import {
@@ -182,32 +183,17 @@ class AlloraConnectorService {
       const isActiveData = JSON.parse(activeStdout!);
       const isActive = typeof isActiveData === 'boolean' ? isActiveData : isActiveData.is_active;
 
-      // Parse the topic response (YAML-like format)
-      // The topic command returns YAML format, so we need to parse it manually
-      const topicLines = topicStdout!.split('\n');
-      let topicId = '';
-      let epochLength = 0;
-      let creator = '';
-      let inTopicSection = false;
+      // Parse the topic response using proper YAML parser
+      const topicData = yaml.load(topicStdout!.trim()) as any;
 
-      for (const line of topicLines) {
-        if (line.includes('topic:')) {
-          inTopicSection = true;
-          continue;
-        }
+      // Extract topic information from the parsed YAML
+      const topic = topicData.topic;
+      const topicId = topic?.id;
+      const epochLength = parseInt(topic?.epoch_length || '0', 10);
+      const creator = topic?.creator;
+      const metadata = topic?.metadata;
 
-        if (inTopicSection) {
-          if (line.includes('id:')) {
-            topicId = line.split('id:')[1].trim().replace(/"/g, '');
-          } else if (line.includes('epoch_length:')) {
-            epochLength = parseInt(line.split('epoch_length:')[1].trim().replace(/"/g, ''), 10);
-          } else if (line.includes('creator:')) {
-            creator = line.split('creator:')[1].trim();
-          }
-        }
-      }
-
-      logger.debug({ topicId, epochLength, creator, isActive, topicStdout }, 'Parsed topic details');
+      logger.debug({ topicId, epochLength, creator, metadata, isActive, topicStdout }, 'Parsed topic details');
 
       if (!topicId || !epochLength || !creator) {
         logger.warn({ topicId: topicId, epochLength, creator, output: topicStdout }, 'Topic data incomplete in chain response.');
@@ -219,6 +205,7 @@ class AlloraConnectorService {
         epochLength: epochLength,
         isActive: isActive,
         creator: creator,
+        metadata: metadata,
       };
     } catch (parseError) {
       logger.error({ err: parseError, topicId, activeStdout }, 'Failed to parse allorad output.');
@@ -277,19 +264,9 @@ class AlloraConnectorService {
     }
 
     try {
-      // Parse YAML-like output
-      const lines = emaScoreStdout!.split('\n');
-      let score = '0';
-
-      for (const line of lines) {
-        if (line.includes('score:')) {
-          const scoreMatch = line.match(/score:\s*"([^"]+)"/);
-          if (scoreMatch) {
-            score = scoreMatch[1];
-            break;
-          }
-        }
-      }
+      // Parse YAML output using proper YAML parser
+      const emaData = yaml.load(emaScoreStdout!.trim()) as any;
+      const score = emaData?.score?.score || '0';
 
       log.debug({ score, output: emaScoreStdout }, 'Parsed EMA score from chain response.');
       return {
@@ -444,6 +421,162 @@ class AlloraConnectorService {
       }
     }
     return null;
+  }
+
+  /**
+   * Get latest network inferences for a topic
+   */
+  public async getLatestNetworkInferences(topicId: string): Promise<any> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'getLatestNetworkInferences', topicId });
+
+    try {
+      log.info('Fetching latest network inferences from Allora network');
+
+      const command = `allorad query emissions latest-network-inferences ${topicId}`;
+      const [stdout, error] = await this.execAsyncWithRetry(command);
+
+      if (error) {
+        log.error({ err: error }, 'Failed to get latest network inferences');
+        return null;
+      }
+
+      // Parse the YAML output using proper YAML parser
+      const inferenceData = yaml.load(stdout!.trim()) as any;
+
+      log.info('Successfully retrieved latest network inferences');
+      return inferenceData;
+
+    } catch (error: any) {
+      log.error({ err: error }, 'Failed to get latest network inferences');
+      return null;
+    }
+  }
+
+  /**
+   * Get active inferers for a topic
+   */
+  public async getActiveInferers(topicId: string): Promise<any> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'getActiveInferers', topicId });
+
+    try {
+      log.info('Fetching active inferers from Allora network');
+
+      const command = `allorad query emissions active-inferers ${topicId}`;
+      const [stdout, error] = await this.execAsyncWithRetry(command);
+
+      if (error) {
+        log.error({ err: error }, 'Failed to get active inferers');
+        return {};
+      }
+
+      // Parse the JSON output
+      const activeInferers = JSON.parse(stdout!.trim());
+
+      log.info('Successfully retrieved active inferers');
+      return activeInferers;
+
+    } catch (error: any) {
+      log.error({ err: error }, 'Failed to get active inferers');
+      return {};
+    }
+  }
+
+  /**
+   * Get active forecasters for a topic
+   */
+  public async getActiveForecasters(topicId: string): Promise<any> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'getActiveForecasters', topicId });
+
+    try {
+      log.info('Fetching active forecasters from Allora network');
+
+      const command = `allorad query emissions active-forecasters ${topicId}`;
+      const [stdout, error] = await this.execAsyncWithRetry(command);
+
+      if (error) {
+        log.error({ err: error }, 'Failed to get active forecasters');
+        return {};
+      }
+
+      // Parse the JSON output
+      const activeForecasters = JSON.parse(stdout!.trim());
+
+      log.info('Successfully retrieved active forecasters');
+      return activeForecasters;
+
+    } catch (error: any) {
+      log.error({ err: error }, 'Failed to get active forecasters');
+      return {};
+    }
+  }
+
+  /**
+   * Get active reputers for a topic
+   */
+  public async getActiveReputers(topicId: string): Promise<any> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'getActiveReputers', topicId });
+
+    try {
+      log.info('Fetching active reputers from Allora network');
+
+      const command = `allorad query emissions active-reputers ${topicId}`;
+      const [stdout, error] = await this.execAsyncWithRetry(command);
+
+      if (error) {
+        log.error({ err: error }, 'Failed to get active reputers');
+        return {};
+      }
+
+      // The active-reputers command returns YAML format, not JSON
+      const activeReputers = yaml.load(stdout!.trim()) as any;
+
+      log.info('Successfully retrieved active reputers');
+      return activeReputers;
+
+    } catch (error: any) {
+      log.error({ err: error }, 'Failed to get active reputers');
+      return {};
+    }
+  }
+
+  /**
+   * Get all active topics from the Allora network
+   */
+  public async getActiveTopics(): Promise<any[]> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'getActiveTopics' });
+
+    try {
+      log.info('Fetching active topics from Allora network');
+
+      // We'll need to query multiple topics to find active ones
+      // For now, let's check topics 1-10 (common range)
+      const activeTopics = [];
+
+      for (let topicId = 1; topicId <= 10; topicId++) {
+        try {
+          const topicDetails = await this.getTopicDetails(topicId.toString());
+          if (topicDetails && topicDetails.isActive) {
+            activeTopics.push({
+              id: topicDetails.id,
+              epochLength: topicDetails.epochLength,
+              creator: topicDetails.creator,
+              isActive: topicDetails.isActive,
+              metadata: topicDetails.metadata
+            });
+          }
+        } catch (error) {
+          // Skip topics that don't exist or have errors
+          continue;
+        }
+      }
+
+      log.info({ activeTopicsCount: activeTopics.length }, 'Successfully retrieved active topics');
+      return activeTopics;
+
+    } catch (error: any) {
+      log.error({ err: error }, 'Failed to get active topics');
+      return [];
+    }
   }
 }
 

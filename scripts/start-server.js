@@ -1,6 +1,6 @@
 /**
  * @description
- * Startup script for the MCP server with optional queue clearing.
+ * Startup script for the HTTP server with optional queue clearing.
  * This helps prevent issues with pending jobs from previous runs.
  */
 

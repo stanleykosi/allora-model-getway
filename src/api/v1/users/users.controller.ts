@@ -15,6 +15,9 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import userService, { CreateUserData } from '@/services/user.service';
+import walletService from '@/services/wallet.service';
+import modelService from '@/services/model.service';
+import secretsService from '@/core/secrets/secrets.service';
 import logger from '@/utils/logger';
 import { registerUserSchema } from './users.schemas';
 
@@ -132,6 +135,105 @@ export const getUserProfileHandler = async (req: Request, res: Response) => {
 
   } catch (error) {
     log.error({ err: error }, 'An unexpected error occurred in getUserProfileHandler.');
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+/**
+ * @controller getUserWalletPhraseHandler
+ * @description Handles the request to retrieve the current user's wallet mnemonic phrase.
+ * This endpoint allows users to retrieve their wallet phrase for backup purposes.
+ *
+ * @workflow
+ * 1. Extracts the authenticated user's ID from `req.user`.
+ * 2. Gets the user's profile to verify they exist.
+ * 3. Retrieves the user's wallet information from the database.
+ * 4. Securely retrieves the mnemonic phrase from the secrets service.
+ * 5. Returns the mnemonic phrase to the user.
+ *
+ * @security
+ * - Requires API key authentication
+ * - Only returns the user's own wallet phrase
+ * - Logs access for audit purposes
+ *
+ * @param req The Express Request object.
+ * @param res The Express Response object.
+ */
+export const getUserWalletPhraseHandler = async (req: Request, res: Response) => {
+  const log = logger.child({ controller: 'getUserWalletPhraseHandler', userId: req.user?.id });
+
+  try {
+    // Step 1: Ensure user is authenticated
+    if (!req.user?.id) {
+      log.warn('FATAL: getUserWalletPhraseHandler reached without an authenticated user. Check middleware order.');
+      return res.status(401).json({ error: 'User not authenticated.' });
+    }
+    const userId = req.user.id;
+
+    // Step 2: Get user profile to verify they exist
+    log.info({ userId }, 'Calling UserService to get user profile.');
+    const userProfile = await userService.getUserById(userId);
+
+    if (!userProfile) {
+      log.warn({ userId }, 'User profile not found.');
+      return res.status(404).json({ error: 'User profile not found.' });
+    }
+
+    // Step 3: Get user's models and their wallets
+    log.info({ userId }, 'Calling ModelService to get user models.');
+    const userModels = await modelService.getModelsByUserId(userId);
+
+    if (!userModels || userModels.length === 0) {
+      log.warn({ userId }, 'No models found for user.');
+      return res.status(404).json({ error: 'No models found for this user. Register a model first to create a wallet.' });
+    }
+
+    // Step 4: Get wallet information for each model
+    const walletPhrases = [];
+
+    for (const model of userModels) {
+      log.info({ userId, modelId: model.id, walletId: model.wallet_id }, 'Retrieving wallet for model.');
+
+      // Get wallet details
+      const wallet = await walletService.getWalletById(model.wallet_id);
+      if (!wallet) {
+        log.warn({ userId, modelId: model.id, walletId: model.wallet_id }, 'Wallet not found for model.');
+        continue;
+      }
+
+      // Securely retrieve the mnemonic phrase
+      const mnemonic = await secretsService.getSecret(wallet.secret_ref);
+      if (!mnemonic) {
+        log.error({ userId, modelId: model.id, walletId: model.wallet_id, secretRef: wallet.secret_ref }, 'Mnemonic not found in secrets service.');
+        continue;
+      }
+
+      walletPhrases.push({
+        model_id: model.id,
+        model_type: model.model_type,
+        topic_id: model.topic_id,
+        wallet_id: wallet.id,
+        wallet_address: wallet.address,
+        mnemonic_phrase: mnemonic,
+        created_at: wallet.created_at
+      });
+    }
+
+    if (walletPhrases.length === 0) {
+      log.warn({ userId }, 'No valid wallet phrases found for user.');
+      return res.status(404).json({ error: 'No valid wallet phrases found for this user.' });
+    }
+
+    // Step 5: Return the wallet phrases
+    log.info({ userId, walletCount: walletPhrases.length }, 'Successfully retrieved wallet phrases.');
+    return res.status(200).json({
+      user_id: userId,
+      wallets: walletPhrases,
+      message: 'Store these mnemonic phrases securely. They are required to access your wallets.'
+    });
+
+  } catch (error) {
+    log.error({ err: error }, 'An unexpected error occurred in getUserWalletPhraseHandler.');
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 }; 

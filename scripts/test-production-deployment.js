@@ -9,6 +9,13 @@
  *   node scripts/test-production-deployment.js
  */
 
+// Load environment variables from .env.local if it exists
+try {
+  require('dotenv').config({ path: '.env.local' });
+} catch (error) {
+  // Ignore if dotenv is not available
+}
+
 console.log('🚀 Production Deployment Test');
 console.log('=============================\n');
 
