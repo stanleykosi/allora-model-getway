@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 
 export default function Layout() {
   console.log('🏗️ Layout component rendering...');
-  
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -12,10 +12,7 @@ export default function Layout() {
         <Header />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <div className="mx-auto max-w-7xl">
-            <div style={{ border: '2px solid red', padding: '10px', margin: '10px' }}>
-              <p>Layout main content area - Outlet should render here:</p>
-              <Outlet />
-            </div>
+            <Outlet />
           </div>
         </main>
       </div>
