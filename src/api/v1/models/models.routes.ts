@@ -11,7 +11,7 @@
  */
 
 import { Router } from 'express';
-import { apiKeyAuth } from '@/api/v1/middleware/auth.middleware';
+import { clerkAuth } from '@/api/v1/middleware/auth.middleware';
 import { registerModelHandler, getModelPerformanceHandler, debugAlloradHandler, debugPerformanceHandler, deactivateModelHandler, activateModelHandler } from './models.controller';
 
 const router = Router();
@@ -22,7 +22,7 @@ const router = Router();
  * @access Protected
  *
  * @middleware
- * - `apiKeyAuth`: Ensures that only authenticated users with a valid API key can
+ * - `clerkAuth`: Ensures that only authenticated users with a valid Clerk token can
  *   access this endpoint.
  *
  * @handler
@@ -30,7 +30,7 @@ const router = Router();
  */
 router.post(
   '/',
-  apiKeyAuth,
+  clerkAuth,
   registerModelHandler
 );
 
@@ -41,14 +41,14 @@ router.post(
  * @access Protected
  *
  * @middleware
- * - `apiKeyAuth`: Ensures that only authenticated users can access this endpoint.
+ * - `clerkAuth`: Ensures that only authenticated users can access this endpoint.
  *
  * @handler
  * - `getModelPerformanceHandler`: The controller function that processes the request.
  */
 router.get(
   '/:modelId/performance',
-  apiKeyAuth,
+  clerkAuth,
   getModelPerformanceHandler
 );
 
@@ -60,7 +60,7 @@ router.get(
  */
 router.get(
   '/debug',
-  apiKeyAuth,
+  clerkAuth,
   debugAlloradHandler
 );
 
@@ -71,7 +71,7 @@ router.get(
  */
 router.post(
   '/:modelId/debug-performance',
-  apiKeyAuth,
+  clerkAuth,
   debugPerformanceHandler
 );
 
@@ -81,14 +81,14 @@ router.post(
  * @access Protected
  *
  * @middleware
- * - `apiKeyAuth`: Ensures that only authenticated users can access this endpoint.
+ * - `clerkAuth`: Ensures that only authenticated users can access this endpoint.
  *
  * @handler
  * - `deactivateModelHandler`: The controller function that processes the request.
  */
 router.put(
   '/:modelId/deactivate',
-  apiKeyAuth,
+  clerkAuth,
   deactivateModelHandler
 );
 
@@ -98,14 +98,14 @@ router.put(
  * @access Protected
  *
  * @middleware
- * - `apiKeyAuth`: Ensures that only authenticated users can access this endpoint.
+ * - `clerkAuth`: Ensures that only authenticated users can access this endpoint.
  *
  * @handler
  * - `activateModelHandler`: The controller function that processes the request.
  */
 router.put(
   '/:modelId/activate',
-  apiKeyAuth,
+  clerkAuth,
   activateModelHandler
 );
 

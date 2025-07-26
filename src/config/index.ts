@@ -38,7 +38,6 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
-
   // Database Configuration
   DATABASE_URL: z.string().url({ message: 'DATABASE_URL must be a valid PostgreSQL connection URL.' }),
 
@@ -50,7 +49,6 @@ const envSchema = z.object({
   CHAIN_ID: z.string().min(1, { message: 'CHAIN_ID is required.' }).default('allora-testnet-1'),
   AVERAGE_BLOCK_TIME_SECONDS: z.coerce.number().int().positive().default(5),
 
-
   // Secrets Management Configuration
   TREASURY_MNEMONIC_SECRET_KEY: z.string().min(1, { message: 'TREASURY_MNEMONIC_SECRET_KEY is required.' }),
 
@@ -59,6 +57,10 @@ const envSchema = z.object({
   VAULT_TOKEN: z.string().optional(),
   VAULT_NAMESPACE: z.string().optional(),
   VAULT_SECRET_PATH: z.string().default('secret/data/mcp'),
+
+  // Clerk Authentication Configuration
+  VITE_CLERK_PUBLISHABLE_KEY: z.string().min(1, { message: 'VITE_CLERK_PUBLISHABLE_KEY is required for authentication.' }),
+  CLERK_SECRET_KEY: z.string().min(1, { message: 'CLERK_SECRET_KEY is required for backend authentication.' }),
 });
 
 /**

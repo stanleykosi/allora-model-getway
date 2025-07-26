@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { apiKeyAuth } from '@/api/v1/middleware/auth.middleware';
+import { clerkAuth } from '@/api/v1/middleware/auth.middleware';
 import {
   getTopicPredictionsHandler,
   getLatestNetworkInferencesHandler,
@@ -11,18 +11,18 @@ import {
 const router = Router();
 
 // Get topic details and current predictions
-router.get('/topic/:topicId', apiKeyAuth, getTopicDetailsHandler);
+router.get('/topic/:topicId', clerkAuth, getTopicDetailsHandler);
 
 // Get latest network inferences for a topic
-router.get('/topic/:topicId/inferences', apiKeyAuth, getLatestNetworkInferencesHandler);
+router.get('/topic/:topicId/inferences', clerkAuth, getLatestNetworkInferencesHandler);
 
 // Get active workers for a topic
-router.get('/topic/:topicId/workers', apiKeyAuth, getActiveWorkersHandler);
+router.get('/topic/:topicId/workers', clerkAuth, getActiveWorkersHandler);
 
 // Get predictions summary for a topic
-router.get('/topic/:topicId/predictions', apiKeyAuth, getTopicPredictionsHandler);
+router.get('/topic/:topicId/predictions', clerkAuth, getTopicPredictionsHandler);
 
 // Get all active topics
-router.get('/topics', apiKeyAuth, getActiveTopicsHandler);
+router.get('/topics', clerkAuth, getActiveTopicsHandler);
 
 export default router; 

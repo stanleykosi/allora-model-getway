@@ -1,18 +1,13 @@
 /**
  * @description
- * This service handles user management operations, including API key generation
- * and validation. It ensures that API keys are generated with unique prefixes
- * for efficient database lookups.
+ * This service handles user management operations using Clerk authentication.
+ * It ensures that users are properly created and managed through Clerk OAuth.
  *
  * @dependencies
- * - bcrypt: For hashing API keys securely.
- * - crypto: For generating cryptographically secure random API keys.
  * - @/persistence/postgres.client: The database client for user operations.
  * - @/utils/logger: The structured logger for logging operations.
  */
 
-import bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
 import pool from '@/persistence/postgres.client';
 import logger from '@/utils/logger';
 
@@ -23,148 +18,87 @@ import logger from '@/utils/logger';
 export interface User {
   id: string;
   email: string;
-  api_key_hash: string;
-  api_key_prefix?: string;
+  clerk_user_id: string;
   created_at: Date;
   updated_at: Date;
 }
 
 /**
- * @interface CreateUserData
- * @description Defines the input data required to create a new user.
+ * @interface ClerkUserData
+ * @description Defines the input data for creating a user from Clerk.
  */
-export interface CreateUserData {
+export interface ClerkUserData {
+  clerkUserId: string;
   email: string;
-  apiKey?: string; // Optional - will generate if not provided
-}
-
-/**
- * @interface CreateUserResult
- * @description Defines the successful output of user creation.
- */
-export interface CreateUserResult {
-  id: string;
-  email: string;
-  apiKey: string; // The plaintext API key (only returned once)
 }
 
 class UserService {
   /**
-   * Generates a cryptographically secure API key with a unique prefix.
-   * @returns A 32-character API key
+   * Gets or creates a user from Clerk authentication.
+   * @param data The Clerk user data.
+   * @returns A promise resolving to the user or null on failure.
    */
-  private generateApiKey(): string {
-    return randomBytes(16).toString('hex');
-  }
-
-  /**
-   * Creates a new user with an API key.
-   * @param data The user creation data.
-   * @returns A promise resolving to the creation result or null on failure.
-   */
-  public async createUser(data: CreateUserData): Promise<CreateUserResult | null> {
-    const log = logger.child({ service: 'UserService', method: 'createUser', email: data.email });
+  public async getOrCreateUserFromClerk(data: ClerkUserData): Promise<User | null> {
+    const log = logger.child({
+      service: 'UserService',
+      method: 'getOrCreateUserFromClerk',
+      clerkUserId: data.clerkUserId,
+      email: data.email
+    });
 
     try {
-      // Generate API key if not provided
-      const apiKey = data.apiKey || this.generateApiKey();
-      const keyPrefix = apiKey.substring(0, 8);
+      log.info({ clerkUserId: data.clerkUserId, email: data.email }, 'Starting user lookup/creation');
 
-      // Hash the API key for secure storage
-      const saltRounds = 12;
-      const apiKeyHash = await bcrypt.hash(apiKey, saltRounds);
-
-      // Check if email already exists
-      const existingUser = await pool.query<User>(
-        'SELECT id FROM users WHERE email = $1',
-        [data.email]
+      // First, try to find existing user by Clerk user ID
+      let { rows } = await pool.query<User>(
+        'SELECT * FROM users WHERE clerk_user_id = $1',
+        [data.clerkUserId]
       );
 
-      if (existingUser.rows.length > 0) {
-        log.warn('User creation failed: Email already exists.');
-        throw new Error('User with this email already exists.');
+      log.debug({ clerkUserId: data.clerkUserId, foundUsers: rows.length }, 'Database lookup result');
+
+      if (rows.length > 0) {
+        log.info({ userId: rows[0].id, clerkUserId: data.clerkUserId }, 'Found existing user by Clerk user ID.');
+        return rows[0];
       }
 
-      // Check if key prefix already exists (should be unique)
-      const existingPrefix = await pool.query<User>(
-        'SELECT id FROM users WHERE api_key_prefix = $1',
-        [keyPrefix]
+      // If email is unknown@example.com, create a unique email based on Clerk user ID
+      let emailToUse = data.email;
+      if (emailToUse === 'unknown@example.com') {
+        emailToUse = `user.${data.clerkUserId}@clerk.local`;
+        log.info({ originalEmail: data.email, newEmail: emailToUse }, 'Generated unique email for user without email');
+      }
+
+      log.info({ emailToUse, clerkUserId: data.clerkUserId }, 'Creating new user');
+
+      // Check if user already exists by email (in case of race condition)
+      const { rows: existingByEmail } = await pool.query<User>(
+        'SELECT * FROM users WHERE email = $1',
+        [emailToUse]
+      );
+      
+      if (existingByEmail.length > 0) {
+        log.info({ userId: existingByEmail[0].id, clerkUserId: data.clerkUserId }, 'Found existing user by email, returning existing user.');
+        return existingByEmail[0];
+      }
+
+      // IMPORTANT: Each Clerk user should have their own database record
+      // We should NOT update existing users with different Clerk IDs
+      // Create new user with Clerk user ID
+      const { rows: newUserRows } = await pool.query<User>(
+        'INSERT INTO users (email, clerk_user_id) VALUES ($1, $2) RETURNING *',
+        [emailToUse, data.clerkUserId]
       );
 
-      if (existingPrefix.rows.length > 0) {
-        log.warn('User creation failed: API key prefix collision.');
-        throw new Error('API key collision detected. Please try again.');
+      if (newUserRows.length > 0) {
+        log.info({ userId: newUserRows[0].id, clerkUserId: data.clerkUserId }, 'Created new user from Clerk authentication.');
+        return newUserRows[0];
       }
 
-      // Insert the new user
-      const query = `
-        INSERT INTO users (email, api_key_hash, api_key_prefix)
-        VALUES ($1, $2, $3)
-        RETURNING id, email;
-      `;
-      const values = [data.email, apiKeyHash, keyPrefix];
-
-      const result = await pool.query<User>(query, values);
-      const newUser = result.rows[0];
-
-      if (!newUser) {
-        log.error('User creation failed: Database insertion failed.');
-        throw new Error('Failed to create user.');
-      }
-
-      log.info({ userId: newUser.id }, 'User created successfully.');
-
-      return {
-        id: newUser.id,
-        email: newUser.email,
-        apiKey, // Return the plaintext key only once
-      };
-    } catch (error) {
-      log.error({ err: error }, 'An unexpected error occurred during user creation.');
+      log.error('Failed to create user from Clerk data.');
       return null;
-    }
-  }
-
-  /**
-   * Validates an API key and returns the associated user.
-   * @param apiKey The API key to validate.
-   * @returns A promise resolving to the user or null if invalid.
-   */
-  public async validateApiKey(apiKey: string): Promise<{ id: string; email: string } | null> {
-    const log = logger.child({ service: 'UserService', method: 'validateApiKey' });
-
-    try {
-      const keyPrefix = apiKey.substring(0, 8);
-
-      // Query for user with matching prefix
-      const { rows: users } = await pool.query<User>(
-        'SELECT id, email, api_key_hash FROM users WHERE api_key_prefix = $1',
-        [keyPrefix]
-      );
-
-      if (!users || users.length === 0) {
-        log.debug('No user found with matching key prefix.');
-        return null;
-      }
-
-      // Since prefixes should be unique, we expect only one user
-      const user = users[0];
-
-      // Securely compare the provided key with the stored hash
-      const match = await bcrypt.compare(apiKey, user.api_key_hash);
-
-      if (match) {
-        log.debug({ userId: user.id }, 'API key validation successful.');
-        return {
-          id: user.id,
-          email: user.email,
-        };
-      } else {
-        log.debug('API key validation failed: Hash mismatch.');
-        return null;
-      }
     } catch (error) {
-      log.error({ err: error }, 'An error occurred during API key validation.');
+      log.error({ err: error, clerkUserId: data.clerkUserId }, 'An error occurred while getting or creating user from Clerk.');
       return null;
     }
   }
@@ -191,6 +125,32 @@ class UserService {
       return rows[0];
     } catch (error) {
       log.error({ err: error }, 'An error occurred while retrieving user.');
+      return null;
+    }
+  }
+
+  /**
+   * Retrieves a user by their Clerk user ID.
+   * @param clerkUserId The Clerk user ID.
+   * @returns A promise resolving to the user or null if not found.
+   */
+  public async getUserByClerkId(clerkUserId: string): Promise<User | null> {
+    const log = logger.child({ service: 'UserService', method: 'getUserByClerkId', clerkUserId });
+
+    try {
+      const { rows } = await pool.query<User>(
+        'SELECT * FROM users WHERE clerk_user_id = $1',
+        [clerkUserId]
+      );
+
+      if (rows.length === 0) {
+        log.debug('User not found by Clerk user ID.');
+        return null;
+      }
+
+      return rows[0];
+    } catch (error) {
+      log.error({ err: error }, 'An error occurred while retrieving user by Clerk ID.');
       return null;
     }
   }

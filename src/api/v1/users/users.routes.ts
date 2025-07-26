@@ -1,32 +1,19 @@
 /**
  * @description
  * This file defines the Express router for all endpoints under `/api/v1/users`.
- * It provides user registration, login, and profile management functionality.
+ * It provides user profile management functionality using Clerk authentication.
  *
  * @dependencies
  * - express: The web framework for creating router instances.
- * - @/api/v1/middleware/auth.middleware: The middleware for API key authentication.
+ * - @/api/v1/middleware/auth.middleware: The middleware for Clerk authentication.
  * - ./users.controller: The controller containing the route handlers.
  */
 
 import { Router } from 'express';
-import { apiKeyAuth } from '@/api/v1/middleware/auth.middleware';
-import { registerUserHandler, getUserProfileHandler, getUserWalletPhraseHandler } from './users.controller';
+import { clerkAuth } from '@/api/v1/middleware/auth.middleware';
+import { getUserProfileHandler, getUserWalletPhraseHandler, getUserModelsHandler } from './users.controller';
 
 const router = Router();
-
-/**
- * @route POST /api/v1/users/register
- * @description Route for registering a new user (data scientist).
- * @access Public
- *
- * @handler
- * - `registerUserHandler`: The controller function that processes the registration request.
- */
-router.post(
-  '/register',
-  registerUserHandler
-);
 
 /**
  * @route GET /api/v1/users/profile
@@ -34,14 +21,14 @@ router.post(
  * @access Protected
  *
  * @middleware
- * - `apiKeyAuth`: Ensures that only authenticated users can access this endpoint.
+ * - `clerkAuth`: Ensures that only authenticated users can access this endpoint.
  *
  * @handler
  * - `getUserProfileHandler`: The controller function that processes the request.
  */
 router.get(
   '/profile',
-  apiKeyAuth,
+  clerkAuth,
   getUserProfileHandler
 );
 
@@ -51,15 +38,32 @@ router.get(
  * @access Protected
  *
  * @middleware
- * - `apiKeyAuth`: Ensures that only authenticated users can access this endpoint.
+ * - `clerkAuth`: Ensures that only authenticated users can access this endpoint.
  *
  * @handler
  * - `getUserWalletPhraseHandler`: The controller function that processes the request.
  */
 router.get(
   '/wallet-phrases',
-  apiKeyAuth,
+  clerkAuth,
   getUserWalletPhraseHandler
+);
+
+/**
+ * @route GET /api/v1/users/models
+ * @description Route for retrieving the current user's models.
+ * @access Protected
+ *
+ * @middleware
+ * - `clerkAuth`: Ensures that only authenticated users can access this endpoint.
+ *
+ * @handler
+ * - `getUserModelsHandler`: The controller function that processes the request.
+ */
+router.get(
+  '/models',
+  clerkAuth,
+  getUserModelsHandler
 );
 
 export default router; 

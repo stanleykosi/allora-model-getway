@@ -1,18 +1,18 @@
 /**
  * @description
- * This file contains the middleware for authenticating API requests using a
- * secret API key. It is designed to be applied to all protected endpoints
- * to ensure that only authorized data scientists can access them.
+ * This file contains the middleware for authenticating API requests using Clerk JWT tokens.
+ * It is designed to be applied to all protected endpoints to ensure that only
+ * authenticated users can access them.
  *
  * @dependencies
  * - express: For handling HTTP requests and responses.
- * - @/services/user.service: The user service for API key validation.
+ * - @clerk/backend: For JWT token verification.
+ * - @/services/user.service: The user service for user management.
  * - @/utils/logger: The application's structured logger.
  */
 
 import { Request, Response, NextFunction } from 'express';
-import bcrypt from 'bcrypt';
-import pool from '@/persistence/postgres.client';
+import { verifyToken } from '@clerk/backend';
 import userService from '@/services/user.service';
 import logger from '@/utils/logger';
 
@@ -25,6 +25,7 @@ declare global {
       user?: {
         id: string;
         email: string;
+        clerkUserId: string;
       };
     }
   }
@@ -32,101 +33,141 @@ declare global {
 
 /**
  * @description
- * Middleware to protect API routes by validating an API key provided in the
- * 'X-API-Key' header.
+ * Middleware to protect API routes by validating Clerk JWT tokens provided in the
+ * 'Authorization' header as 'Bearer <token>'.
  *
  * @workflow
- * 1. Extracts the API key from the 'X-API-Key' request header.
- * 2. If the key is missing, it responds with a 401 Unauthorized error.
- * 3. Uses the UserService to validate the API key efficiently.
+ * 1. Extracts the JWT token from the 'Authorization' request header.
+ * 2. If the token is missing, it responds with a 401 Unauthorized error.
+ * 3. Uses Clerk's verifyToken to validate the JWT token.
  * 4. If validation succeeds, it attaches the user's details to the request object.
  * 5. If validation fails, it responds with a 401 error.
  *
  * @security
- * - Uses bcrypt.compare for securely comparing keys, which helps defend against timing attacks.
- * - Responds with a generic "Unauthorized" message to prevent leaking information
- *   about whether a key is valid or not.
- *
- * @performance
- * This implementation uses the UserService which leverages key prefixes for
- * efficient database lookups, avoiding the need to scan all users.
+ * - Uses Clerk's verifyToken for secure JWT validation.
+ * - Responds with a generic "Unauthorized" message to prevent leaking information.
  */
-export const apiKeyAuth = async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
-  const apiKey = req.headers['x-api-key'];
+export const clerkAuth = async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
+  const authHeader = req.headers.authorization;
 
-  if (!apiKey || typeof apiKey !== 'string') {
-    logger.warn('Authentication failed: No API key provided in "X-API-Key" header.');
-    return res.status(401).json({ error: 'Unauthorized: API key is required.' });
+  logger.info({
+    authHeader: authHeader,
+    hasAuthHeader: !!authHeader,
+    startsWithBearer: authHeader?.startsWith('Bearer '),
+    headerLength: authHeader?.length,
+    userAgent: req.headers['user-agent'],
+    referer: req.headers['referer'],
+    origin: req.headers['origin']
+  }, 'Received authorization header');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    logger.warn('Authentication failed: No Bearer token provided in Authorization header.');
+    return res.status(401).json({ error: 'Unauthorized: Bearer token is required.' });
   }
 
-  try {
-    // Use the UserService to validate the API key
-    const authenticatedUser = await userService.validateApiKey(apiKey);
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    if (authenticatedUser) {
-      logger.debug({ userId: authenticatedUser.id }, 'API key authentication successful.');
-      req.user = authenticatedUser; // Attach user information to the request object.
-      return next(); // Proceed to the next middleware or route handler.
+  logger.debug({
+    tokenLength: token.length,
+    tokenPreview: token.substring(0, 20) + '...',
+    isJWTFormat: token.split('.').length === 3
+  }, 'Extracted token from header');
+
+  try {
+    // Verify the JWT token using Clerk
+    // For backend verification, we use the secret key
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
+
+    if (!payload || !payload.sub) {
+      logger.warn('Authentication failed: Invalid JWT token payload.');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Get the full user profile from Clerk using REST API
+    let email = 'unknown@example.com';
+    try {
+      logger.debug({ clerkUserId: payload.sub }, 'Attempting to fetch user from Clerk API');
+
+      const response = await fetch(`https://api.clerk.com/v1/users/${payload.sub}`, {
+        headers: {
+          'Authorization': `Bearer ${process.env.CLERK_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      logger.debug({
+        clerkUserId: payload.sub,
+        status: response.status,
+        statusText: response.statusText
+      }, 'Clerk API response received');
+
+      if (response.ok) {
+        const clerkUser = await response.json() as any;
+
+        logger.debug({
+          clerkUserId: payload.sub,
+          hasEmailAddresses: !!clerkUser.email_addresses,
+          emailAddressesLength: clerkUser.email_addresses?.length
+        }, 'Clerk user data received');
+
+        if (clerkUser.email_addresses && clerkUser.email_addresses.length > 0) {
+          email = clerkUser.email_addresses[0].email_address;
+          logger.info({
+            clerkUserId: payload.sub,
+            email: email,
+            emailVerified: clerkUser.email_addresses[0].verification?.status
+          }, 'Retrieved user email from Clerk API');
+        } else {
+          logger.warn({ clerkUserId: payload.sub }, 'No email addresses found for user');
+        }
+      } else {
+        const errorText = await response.text();
+        logger.error({
+          clerkUserId: payload.sub,
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText
+        }, 'Failed to get user from Clerk API');
+      }
+    } catch (error) {
+      logger.error({ err: error, clerkUserId: payload.sub }, 'Failed to get user from Clerk API');
+      // Fall back to unknown email
+    }
+
+    // Get or create user in our database
+    const user = await userService.getOrCreateUserFromClerk({
+      clerkUserId: payload.sub,
+      email: email,
+    });
+
+    if (user) {
+      logger.debug({ userId: user.id, clerkUserId: payload.sub }, 'Clerk authentication successful.');
+      req.user = {
+        id: user.id,
+        email: user.email,
+        clerkUserId: payload.sub,
+      };
+      return next();
     } else {
-      logger.warn('Authentication failed: Provided API key is invalid.');
+      logger.warn('Authentication failed: Could not get or create user from Clerk.');
       return res.status(401).json({ error: 'Unauthorized' });
     }
   } catch (error) {
-    logger.error({ err: error }, 'A critical error occurred during API key authentication.');
-    return res.status(500).json({ error: 'Internal Server Error' });
+    logger.error({ err: error }, 'A critical error occurred during Clerk authentication.');
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 };
 
 /**
  * @description
- * Fallback authentication middleware for backward compatibility.
- * This should be used only if the api_key_prefix column doesn't exist yet.
+ * Legacy API key authentication middleware for backward compatibility.
+ * This should be used only during the transition period.
  * 
- * @deprecated Use apiKeyAuth instead for better performance.
+ * @deprecated Use clerkAuth instead for better security and user experience.
  */
-export const apiKeyAuthLegacy = async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
-  const apiKey = req.headers['x-api-key'];
-
-  if (!apiKey || typeof apiKey !== 'string') {
-    logger.warn('Authentication failed: No API key provided in "X-API-Key" header.');
-    return res.status(401).json({ error: 'Unauthorized: API key is required.' });
-  }
-
-  try {
-    // WARNING: Inefficient operation. See performance warning in function documentation.
-    const { rows: users } = await pool.query<{ id: string; email: string; api_key_hash: string }>(
-      'SELECT id, email, api_key_hash FROM users'
-    );
-
-    if (!users || users.length === 0) {
-      logger.warn('Authentication failed: No users exist in the database.');
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    let authenticatedUser: { id: string; email: string } | null = null;
-
-    for (const user of users) {
-      // Securely compare the provided key with the stored hash.
-      const match = await bcrypt.compare(apiKey, user.api_key_hash);
-      if (match) {
-        authenticatedUser = {
-          id: user.id,
-          email: user.email,
-        };
-        break; // Found a match, no need to check further.
-      }
-    }
-
-    if (authenticatedUser) {
-      logger.debug({ userId: authenticatedUser.id }, 'API key authentication successful.');
-      req.user = authenticatedUser; // Attach user information to the request object.
-      return next(); // Proceed to the next middleware or route handler.
-    } else {
-      logger.warn('Authentication failed: Provided API key is invalid.');
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  } catch (error) {
-    logger.error({ err: error }, 'A critical error occurred during API key authentication.');
-    return res.status(500).json({ error: 'Internal Server Error' });
-  }
+export const apiKeyAuth = async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
+  logger.warn('API key authentication is deprecated. Please use Clerk authentication.');
+  return res.status(401).json({ error: 'API key authentication is no longer supported. Please use Clerk authentication.' });
 }; 
