@@ -1,7 +1,7 @@
-import { SignIn } from '@clerk/clerk-react';
+import { SignUp } from '@clerk/clerk-react';
 import { Sparkles, Github, Lock, Zap, Globe } from 'lucide-react';
 
-export default function LoginPage() {
+export default function SignUpPage() {
   return (
     <div className="min-h-screen w-full bg-gray-50 text-gray-900 flex justify-center items-center p-4 relative overflow-hidden">
       {/* Background decorative elements */}
@@ -14,18 +14,18 @@ export default function LoginPage() {
             <Sparkles className="h-8 w-8 text-blue-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">
-            Welcome to Allora Gateway
+            Create your Allora Gateway Account
           </h1>
           <p className="mt-2 text-md text-gray-600">
-            Sign in to continue to your dashboard
+            Sign up to get started
           </p>
         </div>
 
         <div className="bg-white p-8 rounded-2xl shadow-xl w-full">
-          <SignIn
-            path="/login"
+          <SignUp
+            path="/sign-up"
             routing="path"
-            signUpUrl="/sign-up"
+            signInUrl="/login"
             redirectUrl="/dashboard"
             appearance={{
               elements: {

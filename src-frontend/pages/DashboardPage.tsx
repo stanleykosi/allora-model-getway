@@ -1,21 +1,31 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import { Eye, Copy, ToggleLeft, ToggleRight } from 'lucide-react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import {
+  User,
+  BarChart3,
+  Plus,
+  Settings,
+  Network,
+  Wallet,
+  TrendingUp,
+  Activity,
+  Sparkles,
+  ArrowRight,
+  Target,
+  Zap,
+  Globe,
+  Award
+} from 'lucide-react';
+import { useAuth } from '@clerk/clerk-react';
 import { useApi } from '@/hooks/useApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
-import { Modal } from '@/components/ui/Modal';
-import { copyToClipboard } from '@/lib/utils';
 
 export default function DashboardPage() {
   console.log('🎯 DashboardPage component is rendering!');
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const api = useApi();
 
   // API functions
@@ -31,11 +41,6 @@ export default function DashboardPage() {
     }
   };
 
-  const updateModelStatus = async ({ modelId, action }: { modelId: string, action: 'activate' | 'deactivate' }): Promise<any> => {
-    const { data } = await api.put(`/api/v1/models/${modelId}/${action}`);
-    return data;
-  };
-
   const { data, isLoading, error } = useQuery({
     queryKey: ['userModels'],
     queryFn: fetchUserModels,
@@ -47,146 +52,291 @@ export default function DashboardPage() {
     },
   });
 
-  const mutation = useMutation({
-    mutationFn: updateModelStatus,
-    onSuccess: (data) => {
-      toast.success(data.message);
-      queryClient.invalidateQueries({ queryKey: ['userModels'] });
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error || "Failed to update model status.");
-    },
-  });
-
-  const handleToggleActive = (modelId: string, currentStatus: boolean) => {
-    const action = currentStatus ? 'deactivate' : 'activate';
-    mutation.mutate({ modelId, action });
-  };
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard!');
-  };
+  const models = data?.models || [];
+  const activeModels = models.filter((model: any) => model.is_active);
+  const inactiveModels = models.filter((model: any) => !model.is_active);
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-lg">Loading your models...</div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-surface/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">Loading Dashboard</h2>
+          <p className="text-text-secondary">Preparing your Allora Network overview...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-lg text-error">Error loading models. Please try again.</div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-surface/20 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-error/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Activity className="h-8 w-8 text-error" />
+          </div>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">Failed to load dashboard</h2>
+          <p className="text-text-secondary mb-6">Please try again later.</p>
+          <Button onClick={() => window.location.reload()} className="bg-gradient-to-r from-primary to-accent">
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
 
-  const models = data?.models || [];
-
   return (
-    <>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-text-primary">Dashboard</h1>
-        <p className="mt-2 text-text-secondary">
-          Manage your registered models and monitor their performance.
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Registered Models</CardTitle>
-          <CardDescription>
-            You have {models.length} model{models.length !== 1 && 's'} registered.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Model ID</TableHead>
-                <TableHead>Topic</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {models.length > 0 ? (
-                models.map((model: any) => {
-                  return (
-                    <TableRow key={model.id}>
-                      <TableCell className="font-mono text-xs">{model.id.substring(0, 18)}...</TableCell>
-                      <TableCell>{model.topic_id}</TableCell>
-                      <TableCell className="capitalize">{model.model_type}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleActive(model.id, model.is_active)}
-                          disabled={mutation.isPending && mutation.variables?.modelId === model.id}
-                        >
-                          {model.is_active ?
-                            <ToggleRight className="mr-2 h-5 w-5 text-accent" /> :
-                            <ToggleLeft className="mr-2 h-5 w-5 text-text-secondary" />
-                          }
-                          {model.is_active ? 'Active' : 'Inactive'}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Link to={`/models/${model.id}`}>
-                          <Button variant="outline" size="sm">
-                            <Eye className="mr-2 h-4 w-4" /> View Performance
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    <div className="text-text-secondary">
-                      <p className="text-lg font-semibold mb-2">No models registered yet</p>
-                      <p className="mb-4">Get started by registering your first model.</p>
-                      <Link to="/models/register">
-                        <Button>
-                          Register Model
-                        </Button>
-                      </Link>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Your Secure Wallet Phrases">
-        <div className="space-y-4">
-          <div className="rounded-md bg-error/10 p-4 text-sm text-error">
-            <p className="font-bold">WARNING: Never share these phrases with anyone.</p>
-            <p>They control your model's funds. Store them securely in a password manager.</p>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-surface/20">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Dashboard
+            </h1>
           </div>
-          <div className="max-h-96 space-y-3 overflow-y-auto pr-2">
-            {models.length > 0 ? (
-              models.map((model) => (
-                <div key={model.id} className="rounded-md border border-surface p-3">
-                  <p className="text-sm font-semibold text-text-primary">Model ID: <span className="font-mono text-xs">{model.id}</span></p>
-                  <p className="text-sm text-text-secondary">Topic: {model.topic_id}</p>
-                  <p className="text-sm text-text-secondary">Type: {model.model_type}</p>
-                  <p className="text-sm text-text-secondary">Status: {model.is_active ? 'Active' : 'Inactive'}</p>
-                </div>
-              ))
-            ) : (
-              <p className="text-center text-text-secondary">No models registered yet.</p>
-            )}
-          </div>
+          <p className="text-lg text-text-secondary max-w-2xl mx-auto">
+            Welcome back! Here's your comprehensive overview of the Allora Network activity.
+          </p>
         </div>
-      </Modal>
-    </>
+
+        {/* User Welcome Section */}
+        <Card className="mb-8 border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
+          <CardContent className="p-8">
+            <div className="flex items-center gap-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl flex items-center justify-center">
+                <User className="h-10 w-10 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-text-primary mb-2">
+                  Welcome back, {user?.firstName || 'User'}! 👋
+                </h2>
+                <p className="text-text-secondary text-lg">
+                  Manage your models, monitor network activity, and track your performance across the Allora Network.
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-primary">{models.length}</div>
+                <div className="text-sm text-text-secondary">Total Models</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="border-0 shadow-xl bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-secondary mb-1">Total Models</p>
+                  <p className="text-3xl font-bold text-primary">{models.length}</p>
+                  <p className="text-xs text-text-secondary mt-1">Registered models</p>
+                </div>
+                <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
+                  <BarChart3 className="h-6 w-6 text-primary" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-xl bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-secondary mb-1">Active Models</p>
+                  <p className="text-3xl font-bold text-green-500">{activeModels.length}</p>
+                  <p className="text-xs text-text-secondary mt-1">Currently running</p>
+                </div>
+                <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
+                  <Activity className="h-6 w-6 text-green-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-xl bg-gradient-to-br from-accent/10 to-accent/5 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-secondary mb-1">Topics</p>
+                  <p className="text-3xl font-bold text-accent">
+                    {new Set(models.map((m: any) => m.topic_id)).size}
+                  </p>
+                  <p className="text-xs text-text-secondary mt-1">Active topics</p>
+                </div>
+                <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center">
+                  <Network className="h-6 w-6 text-accent" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-secondary mb-1">Inactive Models</p>
+                  <p className="text-3xl font-bold text-purple-500">{inactiveModels.length}</p>
+                  <p className="text-xs text-text-secondary mt-1">Paused models</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                  <Settings className="h-6 w-6 text-purple-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Link to="/models/register">
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                    <Plus className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-text-primary text-lg">Register Model</h3>
+                    <p className="text-sm text-text-secondary">Add a new model to the network</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/models/manage">
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-accent/10 to-accent/5 backdrop-blur-sm hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center group-hover:bg-accent/30 transition-colors">
+                    <Settings className="h-6 w-6 text-accent" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-text-primary text-lg">Manage Models</h3>
+                    <p className="text-sm text-text-secondary">View and control your models</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/network">
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
+                    <Network className="h-6 w-6 text-green-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-text-primary text-lg">Network</h3>
+                    <p className="text-sm text-text-secondary">Monitor network activity</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/wallet">
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 backdrop-blur-sm hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center group-hover:bg-purple-500/30 transition-colors">
+                    <Wallet className="h-6 w-6 text-purple-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-text-primary text-lg">Wallet</h3>
+                    <p className="text-sm text-text-secondary">Manage wallet & credentials</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Recent Activity */}
+        <Card className="border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
+          <CardHeader className="pb-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">Recent Activity</CardTitle>
+                <CardDescription className="text-base">
+                  Your latest model activity and network participation
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {models.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <BarChart3 className="h-10 w-10 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold text-text-primary mb-3">No models registered yet</h3>
+                <p className="text-text-secondary mb-6 max-w-md mx-auto">
+                  Get started by registering your first model to participate in the Allora Network and start earning rewards.
+                </p>
+                <Link to="/models/register">
+                  <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-12 px-8">
+                    <Plus className="h-5 w-5 mr-2" />
+                    Register Your First Model
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {models.slice(0, 3).map((model: any) => (
+                  <div key={model.id} className="flex items-center justify-between p-6 border border-border rounded-xl bg-surface/50 hover:bg-surface/80 transition-all group">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-4 h-4 rounded-full ${model.is_active ? 'bg-green-500' : 'bg-gray-500'} group-hover:scale-110 transition-transform`} />
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+                          <Target className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-text-primary">
+                            Model {model.id.substring(0, 8)}...
+                          </h4>
+                          <p className="text-sm text-text-secondary">
+                            Topic {model.topic_id} • {model.model_type}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <Link to={`/models/${model.id}`}>
+                      <Button variant="outline" size="sm" className="group-hover:bg-primary group-hover:text-white transition-all">
+                        View Details
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </Link>
+                  </div>
+                ))}
+                {models.length > 3 && (
+                  <div className="text-center pt-6">
+                    <Link to="/models/manage">
+                      <Button variant="outline" className="h-12 px-8">
+                        View All Models
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 } 
