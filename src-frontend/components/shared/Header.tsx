@@ -46,8 +46,8 @@ export default function Header() {
 
   return (
     <header className={`sticky top-0 z-50 transition-all duration-300 ${isScrolled
-        ? 'bg-surface/80 backdrop-blur-xl border-b border-border/50 shadow-lg shadow-black/5'
-        : 'bg-surface/40 backdrop-blur-sm border-b border-border/30'
+      ? 'bg-surface/80 backdrop-blur-xl border-b border-border/50 shadow-lg shadow-black/5'
+      : 'bg-surface/40 backdrop-blur-sm border-b border-border/30'
       }`}>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
@@ -65,39 +65,10 @@ export default function Header() {
               )}
             </button>
 
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-8 h-8 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg flex items-center justify-center backdrop-blur-sm border border-primary/20">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-surface animate-pulse" />
-              </div>
-
-              <div className="hidden sm:block">
-                <SignedIn>
-                  <Link
-                    to="/dashboard"
-                    className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hover:opacity-80 transition-opacity"
-                  >
-                    Allora Gateway
-                  </Link>
-                </SignedIn>
-                <SignedOut>
-                  <Link
-                    to="/"
-                    className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hover:opacity-80 transition-opacity"
-                  >
-                    Allora Gateway
-                  </Link>
-                </SignedOut>
-              </div>
-            </div>
-
             {/* Page Title */}
-            <div className="hidden md:flex items-center gap-2 ml-6 pl-6 border-l border-border/50">
+            <div className="flex items-center gap-2">
               <div className="w-1 h-1 bg-primary rounded-full" />
-              <span className="text-sm font-medium text-text-secondary">
+              <span className="text-lg font-semibold text-text-primary">
                 {getPageTitle()}
               </span>
             </div>
