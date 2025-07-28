@@ -40,7 +40,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-            styleSrc: config.NODE_ENV === 'development' 
+      styleSrc: config.NODE_ENV === 'development'
         ? ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"]
         : ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Allow inline styles for Clerk
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -110,6 +110,11 @@ app.use(cors({
 
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
+
+    // Allow same-origin requests (for static files and same-domain requests)
+    if (origin && origin.includes('railway.app')) {
+      return callback(null, true);
+    }
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);

@@ -67,6 +67,9 @@ const envSchema = z.object({
   // CORS Configuration
   ALLOWED_ORIGINS: z.string().optional(),
 
+  // Railway Configuration
+  RAILWAY_PUBLIC_DOMAIN: z.string().optional(),
+
   // Rate Limiting Configuration
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000), // 15 minutes
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100), // Max requests per window
