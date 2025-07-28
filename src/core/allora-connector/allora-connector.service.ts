@@ -295,7 +295,7 @@ class AlloraConnectorService {
       return {
         topicId,
         workerAddress,
-        emaScore: emaScoreData
+        emaScore: emaScoreData.score
       };
 
     } catch (error: any) {
