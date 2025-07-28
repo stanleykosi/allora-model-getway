@@ -1,5 +1,5 @@
-# Use Node.js 18 Alpine for production
-FROM node:18-alpine
+# Use Node.js 22 Alpine for production (required for all packages)
+FROM node:22-alpine
 
 # Set working directory
 WORKDIR /app
@@ -7,14 +7,23 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including dev dependencies for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application (backend + frontend)
 RUN npm run build:full
+
+# Verify builds completed successfully
+RUN ls -la dist/ && ls -la dist-frontend/ && echo "✅ Build verification complete"
+
+# Remove dev dependencies after build to reduce image size
+RUN npm ci --only=production && npm cache clean --force
+
+# Verify static files are still there after cleanup
+RUN ls -la dist-frontend/ && echo "✅ Frontend files preserved after cleanup"
 
 # Expose port
 EXPOSE 3000
