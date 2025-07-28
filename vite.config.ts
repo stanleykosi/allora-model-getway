@@ -14,4 +14,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src-frontend"),
     },
   },
+  define: {
+    // Provide fallback for environment variables
+    'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(
+      process.env.VITE_CLERK_PUBLISHABLE_KEY || 'pk_test_Y2VudHJhbC1iaXNvbi05Ny5jbGVyay5hY2NvdW50cy5kZXYk'
+    ),
+  },
 }) 

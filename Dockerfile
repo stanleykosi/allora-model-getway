@@ -13,11 +13,11 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the backend only
-RUN npm run build
+# Build the application (backend + frontend)
+RUN npm run build:full
 
-# Verify backend build completed successfully
-RUN ls -la dist/ && echo "✅ Backend build verification complete"
+# Verify builds completed successfully
+RUN ls -la dist/ && ls -la dist-frontend/ && echo "✅ Build verification complete"
 
 # Remove dev dependencies after build to reduce image size
 RUN npm ci --only=production && npm cache clean --force

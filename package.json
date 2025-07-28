@@ -14,7 +14,7 @@
     "build": "tsc && tsc-alias",
     "build:frontend": "vite build",
     "build:full": "npm run build && npm run build:frontend",
-    "serve": "npm run build:frontend && node dist/index.js",
+    "serve": "node dist/index.js",
     "serve:dev": "node dist/index.js | pino-pretty",
     "dev": "vite",
     "preview": "vite preview",
