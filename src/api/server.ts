@@ -238,11 +238,13 @@ app.use('/api/v1/users', authLimiter, userRoutes);
 app.use('/api/v1/predictions', predictionRoutes);
 
 // --- Frontend Static Files ---
-// Serve static files from the frontend build directory
-app.use(express.static(path.join(__dirname, '../../dist-frontend')));
+// Serve static files from the frontend build directory using absolute project root path. This works
+// both when running via ts-node (src/ paths) and when running the compiled code from dist/.
+const FRONTEND_BUILD_DIR = path.join(process.cwd(), 'dist-frontend');
+app.use(express.static(FRONTEND_BUILD_DIR));
 
 // Serve the logo and other public assets
-app.use(express.static(path.join(__dirname, '../../public')));
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 // --- Frontend Routing ---
 // Handle all non-API routes by serving the frontend application
@@ -254,7 +256,7 @@ app.get('*', (req: Request, res: Response) => {
   }
 
   // Serve the frontend application for all other routes
-  res.sendFile(path.join(__dirname, '../../dist-frontend/index.html'));
+  res.sendFile(path.join(FRONTEND_BUILD_DIR, 'index.html'));
 });
 
 export default app; 
