@@ -109,6 +109,29 @@ class AlloraConnectorService {
     for (let i = 0; i < this.MAX_RETRIES; i++) {
       try {
         logger.debug({ attempt: i + 1, command }, 'Executing allorad command');
+
+        // First, let's check if allorad is available
+        if (i === 0) {
+          try {
+            const { stdout: versionOutput } = await execAsync('allorad version', {
+              env: {
+                ...process.env,
+                ALLORA_CHAIN_ID: config.CHAIN_ID,
+                ALLORA_RPC_URL: config.ALLORA_RPC_URL
+              }
+            });
+            logger.info({ versionOutput }, 'Allorad version check successful');
+          } catch (versionError) {
+            logger.error({ versionError }, 'Allorad version check failed - binary may not be available');
+          }
+        }
+
+        // Log the environment variables being used
+        logger.debug({
+          ALLORA_CHAIN_ID: config.CHAIN_ID,
+          ALLORA_RPC_URL: config.ALLORA_RPC_URL
+        }, 'Allorad environment configuration');
+
         const { stdout, stderr } = await execAsync(command, {
           env: {
             ...process.env,
@@ -126,7 +149,7 @@ class AlloraConnectorService {
         return [stdout, null];
       } catch (error) {
         logger.error(
-          { err: error, attempt: i + 1, command },
+          { err: error, attempt: i + 1, command, errorMessage: (error as Error).message },
           `Attempt ${i + 1} failed for command.`
         );
         if (i === this.MAX_RETRIES - 1) {
@@ -162,7 +185,7 @@ class AlloraConnectorService {
    * @returns A promise resolving to TopicDetails or null if not found/error.
    */
   public async getTopicDetails(topicId: string): Promise<TopicDetails | null> {
-    const getTopicCmd = `allorad query emissions topic ${topicId}`;
+    const getTopicCmd = `allorad query emissions topic ${topicId} --node ${config.ALLORA_RPC_URL}`;
     const [topicStdout, topicErr] = await this.execAsyncWithRetry(getTopicCmd);
 
     if (topicErr) {
@@ -170,7 +193,7 @@ class AlloraConnectorService {
       return null;
     }
 
-    const isActiveCmd = `allorad query emissions is-topic-active ${topicId} --output json`;
+    const isActiveCmd = `allorad query emissions is-topic-active ${topicId} --output json --node ${config.ALLORA_RPC_URL}`;
     const [activeStdout, activeErr] = await this.execAsyncWithRetry(isActiveCmd);
 
     if (activeErr) {
@@ -219,7 +242,7 @@ class AlloraConnectorService {
    * @returns A promise resolving to the balance as a number, or null on error.
    */
   public async getAccountBalance(address: string): Promise<number | null> {
-    const command = `allorad query bank balances ${address} --output json`;
+    const command = `allorad query bank balances ${address} --output json --node ${config.ALLORA_RPC_URL}`;
     const [stdout, error] = await this.execAsyncWithRetry(command);
 
     if (error) {
@@ -254,26 +277,29 @@ class AlloraConnectorService {
   public async getWorkerPerformance(topicId: string, workerAddress: string): Promise<AlloraWorkerPerformance | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'getWorkerPerformance', topicId, workerAddress });
 
-    // Fetches the Exponential Moving Average score for the worker.
-    const getEmaScoreCmd = `allorad query emissions inferer-score-ema ${topicId} ${workerAddress}`;
-    const [emaScoreStdout, emaScoreErr] = await this.execAsyncWithRetry(getEmaScoreCmd);
-
-    if (emaScoreErr) {
-      log.error({ err: emaScoreErr }, 'Failed to get worker EMA score from chain.');
-      return null;
-    }
-
     try {
-      // Parse YAML output using proper YAML parser
-      const emaData = yaml.load(emaScoreStdout!.trim()) as any;
-      const score = emaData?.score?.score || '0';
+      log.info('Fetching worker performance from Allora network');
 
-      log.debug({ score, output: emaScoreStdout }, 'Parsed EMA score from chain response.');
+      const getEmaScoreCmd = `allorad query emissions inferer-score-ema ${topicId} ${workerAddress} --node ${config.ALLORA_RPC_URL}`;
+      const [stdout, error] = await this.execAsyncWithRetry(getEmaScoreCmd);
+
+      if (error) {
+        log.error({ err: error }, 'Failed to get worker performance');
+        return null;
+      }
+
+      // Parse the JSON output
+      const emaScoreData = JSON.parse(stdout!.trim()) as AlloraEmaScore;
+
+      log.info('Successfully retrieved worker performance');
       return {
-        emaScore: score,
+        topicId,
+        workerAddress,
+        emaScore: emaScoreData
       };
-    } catch (parseError) {
-      log.error({ err: parseError, output: emaScoreStdout }, 'Failed to parse EMA score output.');
+
+    } catch (error: any) {
+      log.error({ err: error }, 'Failed to get worker performance');
       return null;
     }
   }
@@ -432,23 +458,23 @@ class AlloraConnectorService {
     try {
       log.info('Fetching latest network inferences from Allora network');
 
-      const command = `allorad query emissions latest-network-inferences ${topicId}`;
+      const command = `allorad query emissions latest-network-inferences ${topicId} --node ${config.ALLORA_RPC_URL}`;
       const [stdout, error] = await this.execAsyncWithRetry(command);
 
       if (error) {
         log.error({ err: error }, 'Failed to get latest network inferences');
-        return null;
+        return {};
       }
 
-      // Parse the YAML output using proper YAML parser
-      const inferenceData = yaml.load(stdout!.trim()) as any;
+      // Parse the JSON output
+      const latestInferences = JSON.parse(stdout!.trim());
 
       log.info('Successfully retrieved latest network inferences');
-      return inferenceData;
+      return latestInferences;
 
     } catch (error: any) {
       log.error({ err: error }, 'Failed to get latest network inferences');
-      return null;
+      return {};
     }
   }
 
@@ -461,7 +487,7 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active inferers from Allora network');
 
-      const command = `allorad query emissions active-inferers ${topicId}`;
+      const command = `allorad query emissions active-inferers ${topicId} --node ${config.ALLORA_RPC_URL}`;
       const [stdout, error] = await this.execAsyncWithRetry(command);
 
       if (error) {
@@ -490,7 +516,7 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active forecasters from Allora network');
 
-      const command = `allorad query emissions active-forecasters ${topicId}`;
+      const command = `allorad query emissions active-forecasters ${topicId} --node ${config.ALLORA_RPC_URL}`;
       const [stdout, error] = await this.execAsyncWithRetry(command);
 
       if (error) {
@@ -519,7 +545,7 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active reputers from Allora network');
 
-      const command = `allorad query emissions active-reputers ${topicId}`;
+      const command = `allorad query emissions active-reputers ${topicId} --node ${config.ALLORA_RPC_URL}`;
       const [stdout, error] = await this.execAsyncWithRetry(command);
 
       if (error) {

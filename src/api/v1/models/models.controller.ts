@@ -172,8 +172,8 @@ export const debugAlloradHandler = async (req: Request, res: Response) => {
 
     log.info('Testing allorad command execution...');
 
-    const isActiveCommand = 'allorad query emissions is-topic-active 1 --output json';
-    const getTopicCommand = 'allorad query emissions topic 1';
+    const isActiveCommand = 'allorad query emissions is-topic-active 1 --output json --node https://testnet.allora.network:26657';
+    const getTopicCommand = 'allorad query emissions topic 1 --node https://testnet.allora.network:26657';
 
     const [isActiveResult, getTopicResult] = await Promise.all([
       execAsync(isActiveCommand, {
