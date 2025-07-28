@@ -1,7 +1,7 @@
 {
   "name": "allora-http-server",
   "version": "0.1.0",
-  "description": "Allora HTTP Server to simplify participation of Data Scientists on the Allora Network.",
+  "description": "Model Gateway - HTTP Server to simplify participation of Data Scientists on the Allora Network.",
   "main": "dist/index.js",
   "type": "commonjs",
   "scripts": {

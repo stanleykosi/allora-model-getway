@@ -10,7 +10,6 @@ import {
   Wallet,
   TrendingUp,
   Activity,
-  Sparkles,
   ArrowRight,
   Target,
   Zap,
@@ -21,6 +20,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useApi } from '@/hooks/useApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import AlloraIcon from '../components/icons/AlloraIcon';
 
 export default function DashboardPage() {
   console.log('🎯 DashboardPage component is rendering!');
@@ -92,7 +92,7 @@ export default function DashboardPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-primary" />
+              <AlloraIcon className="h-6 w-6 text-primary" />
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Dashboard
@@ -299,7 +299,7 @@ export default function DashboardPage() {
                 {models.slice(0, 3).map((model: any) => (
                   <div key={model.id} className="flex items-center justify-between p-6 border border-border rounded-xl bg-surface/50 hover:bg-surface/80 transition-all group">
                     <div className="flex items-center gap-4">
-                      <div className={`w-4 h-4 rounded-full ${model.is_active ? 'bg-green-500' : 'bg-gray-500'} group-hover:scale-110 transition-transform`} />
+                      <div className={`w-4 h-4 rounded-full ${model.is_active ? 'bg-green-500' : 'bg-text-secondary/50'} group-hover:scale-110 transition-transform`} />
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
                           <Target className="h-5 w-5 text-primary" />

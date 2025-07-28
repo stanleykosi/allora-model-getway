@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Github,
   ExternalLink,
-  Sparkles,
   Target,
   Network,
   Users,
@@ -26,6 +25,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import AlloraIcon from '../components/icons/AlloraIcon';
 
 export default function LandingPage() {
   const [isVisible, setIsVisible] = useState(false);
@@ -102,16 +102,12 @@ export default function LandingPage() {
       <header className="relative border-b border-border/30 bg-surface/40 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center">
               <div className="relative">
-                <div className="w-8 h-8 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg flex items-center justify-center backdrop-blur-sm border border-primary/20">
-                  <Sparkles className="h-4 w-4 text-primary" />
+                <div className="w-12 h-12 bg-gradient-to-br from-primary via-accent to-purple-500 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-primary/30 shadow-lg shadow-primary/20 hover:scale-105 transition-all duration-300">
+                  <AlloraIcon className="h-6 w-6 text-white" />
                 </div>
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-surface animate-pulse" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Allora Gateway
-              </span>
             </div>
             <div className="flex items-center gap-4">
               <a
@@ -151,10 +147,10 @@ export default function LandingPage() {
             <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
               <div className="flex items-center justify-center gap-3 mb-6">
                 <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-primary/20">
-                  <Sparkles className="h-8 w-8 text-primary" />
+                  <AlloraIcon className="h-8 w-8 text-primary" />
                 </div>
                 <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-primary via-accent to-purple-500 bg-clip-text text-transparent">
-                  Allora Gateway
+                  Model Gateway
                 </h1>
               </div>
               <p className="mt-8 text-xl md:text-2xl leading-relaxed text-text-secondary max-w-4xl mx-auto">
@@ -163,19 +159,19 @@ export default function LandingPage() {
                 Register your ML models, manage wallets, and earn rewards seamlessly.
               </p>
 
-              {/* Stats */}
+              {/* Key Features */}
               <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
-                <div className="p-6 bg-surface/50 backdrop-blur-sm rounded-2xl border border-border/50">
-                  <div className="text-3xl font-bold text-primary">1000+</div>
-                  <div className="text-sm text-text-secondary">Active Models</div>
+                <div className="p-6 bg-surface/50 backdrop-blur-sm rounded-2xl border border-border/50 hover:border-primary/30 transition-all duration-300">
+                  <div className="text-3xl font-bold text-primary">Ready</div>
+                  <div className="text-sm text-text-secondary">Production Ready</div>
                 </div>
-                <div className="p-6 bg-surface/50 backdrop-blur-sm rounded-2xl border border-border/50">
-                  <div className="text-3xl font-bold text-accent">$2M+</div>
-                  <div className="text-sm text-text-secondary">Rewards Distributed</div>
+                <div className="p-6 bg-surface/50 backdrop-blur-sm rounded-2xl border border-border/50 hover:border-accent/30 transition-all duration-300">
+                  <div className="text-3xl font-bold text-accent">Beta</div>
+                  <div className="text-sm text-text-secondary">Early Access</div>
                 </div>
-                <div className="p-6 bg-surface/50 backdrop-blur-sm rounded-2xl border border-border/50">
-                  <div className="text-3xl font-bold text-purple-500">99.9%</div>
-                  <div className="text-sm text-text-secondary">Uptime</div>
+                <div className="p-6 bg-surface/50 backdrop-blur-sm rounded-2xl border border-border/50 hover:border-purple-500/30 transition-all duration-300">
+                  <div className="text-3xl font-bold text-purple-500">Open</div>
+                  <div className="text-sm text-text-secondary">Source Platform</div>
                 </div>
               </div>
 
@@ -253,22 +249,11 @@ export default function LandingPage() {
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-text-primary">{feature.title}</h3>
-                        <div className="flex items-center gap-1">
-                          <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                          <span className="text-sm text-text-secondary">Premium Feature</span>
-                        </div>
                       </div>
                     </div>
                     <p className="text-text-secondary leading-relaxed">
                       {feature.description}
                     </p>
-
-                    {/* Active Indicator */}
-                    {isActive && (
-                      <div className="absolute top-4 right-4">
-                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               );
@@ -282,8 +267,8 @@ export default function LandingPage() {
                 key={index}
                 onClick={() => setActiveFeature(index)}
                 className={`w-3 h-3 rounded-full transition-all duration-300 ${activeFeature === index
-                    ? 'bg-primary scale-125'
-                    : 'bg-border hover:bg-text-secondary'
+                  ? 'bg-primary scale-125'
+                  : 'bg-border hover:bg-text-secondary'
                   }`}
               />
             ))}
@@ -357,7 +342,7 @@ export default function LandingPage() {
             <CardHeader className="relative text-center pb-8">
               <div className="flex items-center justify-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl flex items-center justify-center">
-                  <Sparkles className="h-6 w-6 text-primary" />
+                  <AlloraIcon className="h-6 w-6 text-primary" />
                 </div>
                 <CardTitle className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                   Ready to get started?

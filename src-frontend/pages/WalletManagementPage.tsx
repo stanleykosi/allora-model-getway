@@ -8,7 +8,6 @@ import {
   Copy,
   Eye,
   EyeOff,
-  Sparkles,
   Target,
   Zap,
   Network,
@@ -26,6 +25,7 @@ import { useApi } from '@/hooks/useApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { copyToClipboard } from '@/lib/utils';
+import AlloraIcon from '../components/icons/AlloraIcon';
 
 export default function WalletManagementPage() {
   console.log('🎯 WalletManagementPage component is rendering!');

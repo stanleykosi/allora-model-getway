@@ -12,7 +12,6 @@ import {
   Plus,
   Search,
   Filter,
-  Sparkles,
   Target,
   Zap,
   Network,
@@ -27,6 +26,7 @@ import { Button } from '@/components/ui/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
 import { Modal } from '@/components/ui/Modal';
 import { copyToClipboard } from '@/lib/utils';
+import AlloraIcon from '../components/icons/AlloraIcon';
 
 export default function ManageModelsPage() {
   console.log('🎯 ManageModelsPage component is rendering!');
@@ -389,7 +389,7 @@ export default function ManageModelsPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${model.is_active ? 'bg-green-500' : 'bg-gray-500'}`} />
+                            <div className={`w-3 h-3 rounded-full ${model.is_active ? 'bg-green-500' : 'bg-text-secondary/50'}`} />
                             <span className={`font-medium ${model.is_active ? 'text-green-500' : 'text-text-secondary'}`}>
                               {model.is_active ? 'Active' : 'Inactive'}
                             </span>
@@ -414,11 +414,10 @@ export default function ManageModelsPage() {
                               size="sm"
                               onClick={() => handleStatusToggle(model)}
                               disabled={activateMutation.isPending || deactivateMutation.isPending}
-                              className={`${
-                                model.is_active 
-                                  ? 'hover:bg-red-500 hover:text-white' 
+                              className={`${model.is_active
+                                  ? 'hover:bg-red-500 hover:text-white'
                                   : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-500/90 hover:to-green-600/90'
-                              } transition-all`}
+                                } transition-all`}
                             >
                               {activateMutation.isPending || deactivateMutation.isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin mr-1" />

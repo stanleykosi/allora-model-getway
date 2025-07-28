@@ -2,7 +2,6 @@ import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-reac
 import { Link, useLocation } from 'react-router-dom';
 import {
   Github,
-  Sparkles,
   Bell,
   Settings,
   Search,
@@ -17,6 +16,7 @@ import {
   Wallet
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import AlloraIcon from '../icons/AlloraIcon';
 
 export default function Header() {
   const location = useLocation();
@@ -41,7 +41,7 @@ export default function Header() {
     if (path === '/models/manage') return 'Manage Models';
     if (path === '/network') return 'Network Monitor';
     if (path === '/wallet') return 'Wallet Management';
-    return 'Allora Gateway';
+    return 'Model Gateway';
   };
 
   return (
@@ -51,12 +51,12 @@ export default function Header() {
       }`}>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo and Brand */}
+          {/* Left Section - Current Context */}
           <div className="flex items-center gap-4">
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-surface/50 transition-colors"
+              className="lg:hidden p-2 rounded-lg hover:bg-surface/50 transition-colors"
             >
               {isMobileMenuOpen ? (
                 <X className="h-5 w-5 text-text-primary" />
@@ -65,59 +65,84 @@ export default function Header() {
               )}
             </button>
 
-            {/* Page Title */}
-            <div className="flex items-center gap-2">
-              <div className="w-1 h-1 bg-primary rounded-full" />
-              <span className="text-lg font-semibold text-text-primary">
-                {getPageTitle()}
+            {/* Current Page Context */}
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-primary to-accent rounded-full animate-pulse" />
+                <span className="text-xl font-bold text-text-primary">
+                  {getPageTitle()}
+                </span>
+              </div>
+
+              {/* Mobile - Just show page title */}
+              <div className="sm:hidden">
+                <span className="text-lg font-semibold text-text-primary">
+                  {getPageTitle()}
+                </span>
+              </div>
+            </div>
+
+            {/* Breadcrumb or Context Info */}
+            <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-border/20">
+              <span className="text-sm text-text-secondary/70 font-medium">
+                {location.pathname === '/dashboard' && 'Overview & Analytics'}
+                {location.pathname === '/models/register' && 'Add New Model'}
+                {location.pathname === '/models/manage' && 'Model Management'}
+                {location.pathname === '/network' && 'Network Activity'}
+                {location.pathname === '/wallet' && 'Wallet & Credentials'}
               </span>
             </div>
           </div>
 
-          {/* Right Section */}
-          <div className="flex items-center gap-3">
-            {/* Search Button */}
-            <button className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface/50 transition-all duration-200 group">
-              <Search className="h-4 w-4 text-text-secondary group-hover:text-primary transition-colors" />
-              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">
-                Search
-              </span>
-            </button>
+          {/* Right Section - Actions & Status */}
+          <div className="flex items-center gap-2">
+            {/* Quick Actions */}
+            <div className="hidden sm:flex items-center gap-1">
+              {/* Search */}
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface/50 transition-all duration-200 group">
+                <Search className="h-4 w-4 text-text-secondary group-hover:text-primary transition-colors" />
+                <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">
+                  Search
+                </span>
+              </button>
+
+              {/* GitHub */}
+              <a
+                href="https://github.com/allora-network/allora-mcp-node"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface/50 transition-all duration-200 group"
+              >
+                <Github className="h-4 w-4 text-text-secondary group-hover:text-primary transition-colors" />
+                <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">
+                  GitHub
+                </span>
+              </a>
+            </div>
 
             {/* Notifications */}
             <button className="relative p-2 rounded-lg hover:bg-surface/50 transition-all duration-200 group">
-              <Bell className="h-5 w-5 text-text-secondary group-hover:text-primary transition-colors" />
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-surface animate-pulse" />
+              <Bell className="h-4 w-4 text-text-secondary group-hover:text-primary transition-colors" />
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
             </button>
 
-            {/* GitHub Link */}
-            <a
-              href="https://github.com/allora-network/allora-mcp-node"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface/50 transition-all duration-200 group"
-            >
-              <Github className="h-4 w-4 text-text-secondary group-hover:text-primary transition-colors" />
-              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">
-                GitHub
+            {/* Connection Status */}
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+              <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+              <span className="text-xs font-medium text-primary">
+                CONNECTED
               </span>
-            </a>
-
-            {/* Status Indicator */}
-            <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-xs font-medium text-green-500">Online</span>
             </div>
 
             {/* Auth Section */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-2">
               {/* Signed Out State */}
               <SignedOut>
                 <SignInButton mode="modal">
-                  <button className="group relative px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-medium transition-all duration-300 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transform hover:scale-105">
+                  <button className="group relative px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-medium transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105">
                     <span className="flex items-center gap-2">
                       Sign In
-                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                      <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
                     </span>
                   </button>
                 </SignInButton>
@@ -138,17 +163,7 @@ export default function Header() {
 
                   {/* User Button */}
                   <div className="relative">
-                    <UserButton
-                      appearance={{
-                        elements: {
-                          avatarBox: "w-8 h-8 rounded-lg border-2 border-border hover:border-primary/50 transition-all duration-300",
-                          userButtonPopoverCard: "bg-surface/95 backdrop-blur-xl border border-border/50 shadow-2xl",
-                          userButtonPopoverActionButton: "text-text-primary hover:bg-surface/80 transition-all duration-200",
-                          userButtonPopoverActionButtonText: "text-text-primary",
-                          userButtonPopoverFooter: "border-t border-border/50"
-                        }
-                      }}
-                    />
+                    <UserButton />
                   </div>
                 </div>
               </SignedIn>

@@ -14,8 +14,7 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  ArrowRight,
-  Sparkles
+  ArrowRight
 } from 'lucide-react';
 import { ModelRegistrationData, ModelRegistrationResponse, ActiveTopicsResponse } from '@/lib/types';
 import { useApi } from '@/hooks/useApi';
@@ -23,6 +22,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import AlloraIcon from '../components/icons/AlloraIcon';
 
 const registerModelSchema = z.object({
   webhook_url: z.string().url({ message: "Must be a valid URL." }),
@@ -91,7 +91,7 @@ export default function RegisterModelPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-primary" />
+              <AlloraIcon className="h-6 w-6 text-primary" />
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Register New Model
@@ -375,7 +375,7 @@ export default function RegisterModelPage() {
             <Card className="border-0 shadow-xl bg-gradient-to-br from-primary/10 to-accent/10">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
+                  <AlloraIcon className="h-5 w-5 text-primary" />
                   What You'll Get
                 </CardTitle>
               </CardHeader>

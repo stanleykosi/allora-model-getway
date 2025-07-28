@@ -6,7 +6,6 @@ import {
   Users,
   Activity,
   Eye,
-  Sparkles,
   Target,
   Zap,
   Globe,
@@ -20,6 +19,7 @@ import { useApi } from '@/hooks/useApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
+import AlloraIcon from '../components/icons/AlloraIcon';
 
 export default function NetworkPage() {
   console.log('🎯 NetworkPage component is rendering!');

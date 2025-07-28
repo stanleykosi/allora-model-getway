@@ -9,7 +9,6 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import {
   ArrowLeft,
   AlertTriangle,
-  Sparkles,
   TrendingUp,
   BarChart3,
   Target,
@@ -22,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useState, useEffect } from 'react';
+import AlloraIcon from '../components/icons/AlloraIcon';
 
 export default function ModelDetailPage() {
   const { modelId } = useParams<{ modelId: string }>();

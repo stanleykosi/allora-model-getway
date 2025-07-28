@@ -6,7 +6,6 @@ import {
   Network,
   Wallet,
   Github,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   Home,
@@ -19,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import AlloraIcon from '../icons/AlloraIcon';
 
 const navLinks = [
   {
@@ -105,13 +105,13 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside
         className={`
-          fixed lg:relative z-50 h-full
-          ${isCollapsed ? 'w-16' : 'w-80'} 
-          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          transition-all duration-300 ease-in-out
-          flex flex-col border-r border-border/50 
-          bg-gradient-to-b from-surface/90 via-surface/70 to-surface/50 backdrop-blur-xl
-          overflow-hidden
+        fixed lg:relative z-50 h-full
+        ${isCollapsed ? 'w-16' : 'w-80'} 
+        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        transition-all duration-300 ease-in-out
+        flex flex-col border-r border-border/50 
+        bg-gradient-to-b from-surface/90 via-surface/70 to-surface/50 backdrop-blur-xl
+        overflow-hidden
           ${isCollapsed ? 'hover:w-80' : ''}
         `}
         onMouseEnter={() => {
@@ -141,22 +141,23 @@ export default function Sidebar() {
             <div className="relative mb-8">
               <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
                 <div className="relative flex-shrink-0">
-                  <div className={`${isCollapsed ? 'w-8 h-8' : 'w-10 h-10'} bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-primary/20`}>
-                    <Sparkles className={`${isCollapsed ? 'h-4 w-4' : 'h-5 w-5'} text-primary`} />
+                  <div className={`${isCollapsed ? 'w-8 h-8' : 'w-12 h-12'} bg-gradient-to-br from-primary via-accent to-purple-500 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-primary/30 shadow-lg shadow-primary/20`}>
+                    <AlloraIcon className={`${isCollapsed ? 'h-4 w-4' : 'h-6 w-6'} text-white`} />
                   </div>
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-surface animate-pulse" />
                 </div>
                 {!isCollapsed && (
                   <div className="flex-1 min-w-0">
-                    <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent truncate">
-                      Allora Gateway
+                    <h1 className="text-xl font-bold bg-gradient-to-r from-primary via-accent to-purple-500 bg-clip-text text-transparent truncate">
+                      Model Gateway
                     </h1>
-                    <p className="text-xs text-text-secondary truncate">Model Gateway</p>
+                    <p className="text-xs text-text-secondary/80 font-medium tracking-widest uppercase truncate">
+                      Enterprise Platform
+                    </p>
                   </div>
                 )}
               </div>
               {!isCollapsed && (
-                <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mt-4" />
+                <div className="h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent mt-6" />
               )}
             </div>
 
@@ -208,11 +209,6 @@ export default function Sidebar() {
                             : 'text-text-secondary group-hover:text-primary'
                             }`}
                         />
-
-                        {/* Active Indicator */}
-                        {isActive && (
-                          <div className="absolute -right-1 -top-1 w-3 h-3 bg-green-500 rounded-full border-2 border-surface animate-pulse" />
-                        )}
                       </div>
 
                       {/* Text Content */}
@@ -283,4 +279,4 @@ export default function Sidebar() {
       </aside>
     </>
   );
-}
+} 

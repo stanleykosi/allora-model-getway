@@ -1,4 +1,4 @@
-# Allora HTTP Server
+# Model Gateway
 
 ## Project Description
 To accelerate the adoption and simplify the participation of Data Scientists (Workers) on the Allora Network. This project delivers a production-grade, API-first HTTP server that abstracts the complexities of blockchain interaction. It acts as a managed "Model-to-Chain" gateway, handling wallet management, automated fee payment, transaction signing, and performance monitoring, allowing data scientists to focus solely on their ML models.
@@ -18,7 +18,7 @@ Follow the setup instructions to get a local copy up and running.
 1.  Clone the repository:
     ```sh
     git clone <repository-url>
-    cd allora-http-server
+    cd model-gateway
     ```
 2.  Install NPM packages:
     ```sh
@@ -39,7 +39,8 @@ npm run start
 ### Building for Production
 
 ```sh
-npm run build```
+npm run build
+```
 
 ### Running in Production
 

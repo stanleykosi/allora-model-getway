@@ -1,15 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import {
-  Sparkles,
-  ArrowLeft,
-  Home,
-  Search,
-  AlertTriangle,
-  Github,
-  ArrowRight
-} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Github, ArrowLeft, Home, Search, Settings, Network, AlertTriangle } from 'lucide-react';
+import AlloraIcon from '../components/icons/AlloraIcon';
 import { useState, useEffect } from 'react';
 
 export default function NotFoundPage() {
@@ -37,12 +30,12 @@ export default function NotFoundPage() {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="w-8 h-8 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg flex items-center justify-center backdrop-blur-sm border border-primary/20">
-                  <Sparkles className="h-4 w-4 text-primary" />
+                  <AlloraIcon className="h-4 w-4 text-primary" />
                 </div>
                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-surface animate-pulse" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Allora Gateway
+                Model Gateway
               </span>
             </div>
             <div className="flex items-center gap-4">
@@ -123,9 +116,9 @@ export default function NotFoundPage() {
                   <h3 className="text-lg font-semibold text-text-primary mb-4">Quick Navigation</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[
-                      { href: "/models/register", title: "Register Model", icon: Sparkles },
-                      { href: "/models/manage", title: "Manage Models", icon: Sparkles },
-                      { href: "/network", title: "Network", icon: Sparkles }
+                      { href: "/models/register", title: "Register Model", icon: AlloraIcon },
+                      { href: "/models/manage", title: "Manage Models", icon: AlloraIcon },
+                      { href: "/network", title: "Network", icon: AlloraIcon }
                     ].map((link) => (
                       <Link
                         key={link.href}
