@@ -104,6 +104,8 @@ export interface AlloraEmaScore {
  * @description A consolidated data structure for a worker's performance on a topic.
  */
 export interface AlloraWorkerPerformance {
+  topicId: string;
+  workerAddress: string;
   emaScore: string;
   // other future performance metrics can be added here
 } 
