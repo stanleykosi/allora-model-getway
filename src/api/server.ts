@@ -47,12 +47,17 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       scriptSrc: config.NODE_ENV === 'development'
         ? ["'self'", "'unsafe-inline'", "'unsafe-eval'"] // React dev needs these
-        : ["'self'", "'unsafe-inline'", "https://*.clerk.com", "https://*.clerk.accounts.dev"], // Allow Clerk scripts
+        : ["'self'", "'unsafe-inline'", "https://*.clerk.com", "https://*.clerk.accounts.dev", "https://*.clerk.dev", "https://clerk.com", "https://clerk.accounts.dev", "https://clerk.dev", "https://clerk.*"], // Allow all Clerk scripts
       connectSrc: [
         "'self'",
         "https://api.clerk.com",
         "https://*.clerk.accounts.dev",
         "https://*.clerk.com",
+        "https://*.clerk.dev",
+        "https://clerk.com",
+        "https://clerk.accounts.dev",
+        "https://clerk.dev",
+        "https://clerk.*",
         ...(config.NODE_ENV === 'development' ? ["ws:", "wss:"] : [])
       ],
       frameSrc: ["'none'"],
