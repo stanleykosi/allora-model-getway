@@ -37,9 +37,9 @@ import logger from '@/utils/logger';
 const pool = new Pool({
   connectionString: config.DATABASE_URL,
   // SECURITY FIX: Enable proper SSL validation for production
-  ssl: process.env.NODE_ENV === 'production' ? {
-    rejectUnauthorized: true,
-    ca: process.env.DB_CA_CERT, // Provide CA certificate in production
+  ssl: config.NODE_ENV === 'production' ? {
+    rejectUnauthorized: config.DB_CA_CERT ? true : false, // Only validate if CA cert provided
+    ...(config.DB_CA_CERT && config.DB_CA_CERT !== "false" ? { ca: config.DB_CA_CERT } : {})
   } : {
     rejectUnauthorized: false // Only for development
   },

@@ -18,9 +18,14 @@
  */
 
 import express, { Express, Request, Response } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import pinoHttp from 'pino-http';
 import path from 'path';
 import logger from '@/utils/logger';
+import { config } from '@/config';
+import securityMonitoring from '@/api/v1/middleware/security.middleware';
 import modelRoutes from '@/api/v1/models/models.routes';
 import userRoutes from '@/api/v1/users/users.routes';
 import predictionRoutes from '@/api/v1/predictions/predictions.routes';
@@ -28,31 +33,152 @@ import predictionRoutes from '@/api/v1/predictions/predictions.routes';
 // Create the Express application instance.
 const app: Express = express();
 
+// --- Security Headers ---
+// SECURITY FIX: Add comprehensive security headers
+app.use(helmet({
+  // Enhanced Content Security Policy
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+            styleSrc: config.NODE_ENV === 'development' 
+        ? ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"]
+        : ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Allow inline styles for Clerk
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      scriptSrc: config.NODE_ENV === 'development'
+        ? ["'self'", "'unsafe-inline'", "'unsafe-eval'"] // React dev needs these
+        : ["'self'", "'unsafe-inline'", "https://*.clerk.com", "https://*.clerk.accounts.dev"], // Allow Clerk scripts
+      connectSrc: [
+        "'self'",
+        "https://api.clerk.com",
+        "https://*.clerk.accounts.dev",
+        "https://*.clerk.com",
+        ...(config.NODE_ENV === 'development' ? ["ws:", "wss:"] : [])
+      ],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      manifestSrc: ["'self'"],
+      mediaSrc: ["'self'"],
+      workerSrc: ["'self'", "blob:"],
+      upgradeInsecureRequests: config.NODE_ENV === 'production' ? [] : null
+    }
+  },
+  // HTTP Strict Transport Security
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  // Prevent MIME type sniffing
+  noSniff: true,
+  // XSS Protection
+  xssFilter: true,
+  // Referrer Policy
+  referrerPolicy: {
+    policy: 'strict-origin-when-cross-origin'
+  },
+  // Hide X-Powered-By header
+  hidePoweredBy: true,
+  // Don't set X-Download-Options for IE8+
+  ieNoOpen: true
+}));
+
+// SECURITY FIX: Add security monitoring and threat detection
+app.use(securityMonitoring);
+
 // --- Global Middleware ---
 
-// Add CORS middleware to allow frontend requests
-app.use((req, res, next) => {
-  // Allow both Vite dev server and same-origin requests
-  const origin = req.headers.origin;
-  const allowedOrigins = ['http://localhost:5173', 'http://localhost:3000'];
-  
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (!origin) {
-    // Same-origin requests (when frontend is served by Express)
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-  }
-  
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
+// SECURITY FIX: Implement strict CORS policy with environment-based configuration
+
+// Define allowed origins based on environment
+const getAllowedOrigins = (): string[] => {
+  if (config.NODE_ENV === 'production') {
+    // Production: Use environment variable for allowed origins
+    return config.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || [];
   } else {
-    next();
+    // Development: Allow local development servers
+    return ['http://localhost:5173', 'http://localhost:3000'];
+  }
+};
+
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowedOrigins = getAllowedOrigins();
+
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Log unauthorized CORS attempts for security monitoring
+    logger.warn({
+      origin,
+      allowedOrigins,
+      ip: origin // We don't have access to req here, so just log the origin
+    }, 'Blocked CORS request from unauthorized origin');
+
+    return callback(new Error('Not allowed by CORS policy'), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  maxAge: 86400 // Cache preflight response for 24 hours
+}));
+
+// SECURITY FIX: Implement rate limiting to prevent DoS and brute force attacks
+const generalLimiter = rateLimit({
+  windowMs: config.RATE_LIMIT_WINDOW_MS, // Time window for rate limiting
+  max: config.RATE_LIMIT_MAX, // Maximum number of requests per window
+  message: {
+    error: 'Too many requests from this IP address. Please try again later.',
+    retryAfter: Math.ceil(config.RATE_LIMIT_WINDOW_MS / 1000 / 60) // minutes
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res) => {
+    logger.warn({
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      endpoint: req.path
+    }, 'Rate limit exceeded');
+
+    res.status(429).json({
+      error: 'Too many requests from this IP address. Please try again later.',
+      retryAfter: Math.ceil(config.RATE_LIMIT_WINDOW_MS / 1000 / 60)
+    });
   }
 });
+
+// Stricter rate limiting for authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Maximum 10 auth attempts per window
+  message: {
+    error: 'Too many authentication attempts. Please try again later.',
+    retryAfter: 15
+  },
+  skipSuccessfulRequests: true, // Don't count successful requests
+  handler: (req, res) => {
+    logger.warn({
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      endpoint: req.path
+    }, 'Auth rate limit exceeded');
+
+    res.status(429).json({
+      error: 'Too many authentication attempts. Please try again later.',
+      retryAfter: 15
+    });
+  }
+});
+
+// Apply general rate limiting to all routes
+app.use(generalLimiter);
 
 // Use pino-http for structured, efficient request logging.
 // This middleware will log every incoming request and its response.
@@ -105,7 +231,8 @@ app.get('/health', (req: Request, res: Response) => {
 app.use('/api/v1/models', modelRoutes);
 
 // Wire up the versioned API routes for the 'users' resource.
-app.use('/api/v1/users', userRoutes);
+// Apply stricter rate limiting to user/auth endpoints
+app.use('/api/v1/users', authLimiter, userRoutes);
 
 // Wire up the versioned API routes for the 'predictions' resource.
 app.use('/api/v1/predictions', predictionRoutes);

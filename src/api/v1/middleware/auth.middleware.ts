@@ -15,6 +15,8 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '@clerk/backend';
 import userService from '@/services/user.service';
 import logger from '@/utils/logger';
+import { config } from '@/config';
+import { logSecurityEvent, logAuthSuccess, SecurityEventType } from './security.middleware';
 
 // Extend the Express Request interface to include an optional 'user' property.
 // This allows us to attach the authenticated user object to the request
@@ -62,6 +64,12 @@ export const clerkAuth = async (req: Request, res: Response, next: NextFunction)
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     logger.warn('Authentication failed: No Bearer token provided in Authorization header.');
+    logSecurityEvent(SecurityEventType.AUTHENTICATION_FAILURE, {
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      url: req.url,
+      reason: 'MISSING_BEARER_TOKEN'
+    });
     return res.status(401).json({ error: 'Unauthorized: Bearer token is required.' });
   }
 
@@ -75,13 +83,19 @@ export const clerkAuth = async (req: Request, res: Response, next: NextFunction)
 
   try {
     // Verify the JWT token using Clerk
-    // For backend verification, we use the secret key
+    // SECURITY FIX: Use validated config instead of direct process.env access
     const payload = await verifyToken(token, {
-      secretKey: process.env.CLERK_SECRET_KEY,
+      secretKey: config.CLERK_SECRET_KEY,
     });
 
     if (!payload || !payload.sub) {
       logger.warn('Authentication failed: Invalid JWT token payload.');
+      logSecurityEvent(SecurityEventType.INVALID_TOKEN, {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        url: req.url,
+        reason: 'INVALID_JWT_PAYLOAD'
+      });
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -92,7 +106,7 @@ export const clerkAuth = async (req: Request, res: Response, next: NextFunction)
 
       const response = await fetch(`https://api.clerk.com/v1/users/${payload.sub}`, {
         headers: {
-          'Authorization': `Bearer ${process.env.CLERK_SECRET_KEY}`,
+          'Authorization': `Bearer ${config.CLERK_SECRET_KEY}`,
           'Content-Type': 'application/json'
         }
       });
@@ -144,6 +158,10 @@ export const clerkAuth = async (req: Request, res: Response, next: NextFunction)
 
     if (user) {
       logger.debug({ userId: user.id, clerkUserId: payload.sub }, 'Clerk authentication successful.');
+
+      // Log successful authentication for security monitoring
+      logAuthSuccess(user.id, user.email, req);
+
       req.user = {
         id: user.id,
         email: user.email,
@@ -156,6 +174,13 @@ export const clerkAuth = async (req: Request, res: Response, next: NextFunction)
     }
   } catch (error) {
     logger.error({ err: error }, 'A critical error occurred during Clerk authentication.');
+    logSecurityEvent(SecurityEventType.AUTHENTICATION_FAILURE, {
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      url: req.url,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      reason: 'AUTH_PROCESSING_ERROR'
+    });
     return res.status(401).json({ error: 'Unauthorized' });
   }
 };

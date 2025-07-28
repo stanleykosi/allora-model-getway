@@ -35,11 +35,13 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
  */
 const envSchema = z.object({
   // Application Configuration
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
   // Database Configuration
   DATABASE_URL: z.string().url({ message: 'DATABASE_URL must be a valid PostgreSQL connection URL.' }),
+  DB_CA_CERT: z.string().optional(), // CA certificate for SSL validation
 
   // Job Queue (Redis) Configuration
   REDIS_URL: z.string().url({ message: 'REDIS_URL must be a valid Redis connection URL.' }),
@@ -61,6 +63,13 @@ const envSchema = z.object({
   // Clerk Authentication Configuration
   VITE_CLERK_PUBLISHABLE_KEY: z.string().min(1, { message: 'VITE_CLERK_PUBLISHABLE_KEY is required for authentication.' }),
   CLERK_SECRET_KEY: z.string().min(1, { message: 'CLERK_SECRET_KEY is required for backend authentication.' }),
+
+  // CORS Configuration
+  ALLOWED_ORIGINS: z.string().optional(),
+
+  // Rate Limiting Configuration
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000), // 15 minutes
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100), // Max requests per window
 });
 
 /**
