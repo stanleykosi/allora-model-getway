@@ -216,6 +216,7 @@ function App() {
         </Route>
 
         {/* Catch-all route */}
+        <Route path="/not-found" element={<NotFoundPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </ErrorBoundary>

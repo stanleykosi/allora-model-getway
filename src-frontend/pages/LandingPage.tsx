@@ -111,7 +111,7 @@ export default function LandingPage() {
             </div>
             <div className="flex items-center gap-4">
               <a
-                href="https://github.com/allora-network/allora-mcp-node"
+                href="https://github.com/stanleykosi/allora-mcp"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface/50 transition-all duration-200"

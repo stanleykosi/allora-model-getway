@@ -50,7 +50,7 @@ export default function SignUpPage() {
 
         <div className="text-center">
           <a
-            href="https://github.com/allora-network/allora-mcp-node"
+            href="https://github.com/stanleykosi/allora-mcp"
             target="_blank"
             rel="noopener noreferrer"
             className="text-text-secondary hover:text-primary transition-colors duration-300 ease-in-out inline-flex items-center space-x-2 hover:scale-105 transform"

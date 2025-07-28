@@ -34,18 +34,28 @@ export default function ModelDetailPage() {
   }, []);
 
   if (!modelId) {
-    navigate('/404');
+    navigate('/not-found');
     return null;
   }
 
   const fetchPerformanceHistory = async (modelId: string): Promise<PerformanceMetricsResponse> => {
-    const { data } = await api.get(`/api/v1/models/${modelId}/performance`);
-    return data;
+    try {
+      const { data } = await api.get(`/api/v1/models/${modelId}/performance`);
+      return data;
+    } catch (error: any) {
+      // If model not found (404) or other API errors, redirect to not found page
+      if (error.response?.status === 404 || error.message?.includes('not found')) {
+        navigate('/not-found');
+        throw error;
+      }
+      throw error;
+    }
   };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['performanceHistory', modelId],
     queryFn: () => fetchPerformanceHistory(modelId),
+    retry: false, // Don't retry on failure - if it fails once, likely invalid model ID
   });
 
   const chartData = data?.performance_metrics.map(d => ({

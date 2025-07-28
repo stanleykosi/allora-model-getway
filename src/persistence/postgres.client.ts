@@ -36,9 +36,12 @@ import logger from '@/utils/logger';
  */
 const pool = new Pool({
   connectionString: config.DATABASE_URL,
-  // Add SSL configuration for Supabase
-  ssl: {
-    rejectUnauthorized: false
+  // SECURITY FIX: Enable proper SSL validation for production
+  ssl: process.env.NODE_ENV === 'production' ? {
+    rejectUnauthorized: true,
+    ca: process.env.DB_CA_CERT, // Provide CA certificate in production
+  } : {
+    rejectUnauthorized: false // Only for development
   },
   // Add connection timeout
   connectionTimeoutMillis: 10000,

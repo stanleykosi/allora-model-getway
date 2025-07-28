@@ -227,12 +227,27 @@ try {
   console.log('✅ React app rendered!');
 } catch (error) {
   console.error('💥 Fatal error in React app:', error);
-  document.body.innerHTML = `
-    <div style="padding: 20px; font-family: Arial, sans-serif;">
-      <h1>Application Error</h1>
-      <p>There was an error loading the application:</p>
-      <pre style="background: #f0f0f0; padding: 10px; border-radius: 4px;">${error.message}</pre>
-      <p>Please check the console for more details.</p>
-    </div>
-  `;
+  
+  // SECURITY FIX: Use safe DOM manipulation instead of innerHTML to prevent XSS
+  const errorContainer = document.createElement('div');
+  errorContainer.style.cssText = 'padding: 20px; font-family: Arial, sans-serif;';
+  
+  const title = document.createElement('h1');
+  title.textContent = 'Application Error';
+  errorContainer.appendChild(title);
+  
+  const description = document.createElement('p');
+  description.textContent = 'There was an error loading the application:';
+  errorContainer.appendChild(description);
+  
+  const errorDetails = document.createElement('pre');
+  errorDetails.style.cssText = 'background: #f0f0f0; padding: 10px; border-radius: 4px;';
+  errorDetails.textContent = error.message || 'Unknown error';
+  errorContainer.appendChild(errorDetails);
+  
+  const helpText = document.createElement('p');
+  helpText.textContent = 'Please check the console for more details.';
+  errorContainer.appendChild(helpText);
+  
+  document.body.appendChild(errorContainer);
 } 

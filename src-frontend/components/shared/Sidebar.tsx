@@ -245,7 +245,7 @@ export default function Sidebar() {
               {/* GitHub Link */}
               <div className={`relative ${isCollapsed ? 'w-full flex justify-center' : ''}`}>
                 <a
-                  href="https://github.com/allora-network/allora-mcp-node"
+                  href="https://github.com/stanleykosi/allora-mcp"
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`group flex items-center gap-4 rounded-xl text-sm font-medium text-text-secondary transition-all duration-300 hover:bg-surface/50 hover:text-text-primary border border-transparent hover:border-border/50 ${isCollapsed ? 'justify-center w-12 h-12' : 'px-4 py-3'

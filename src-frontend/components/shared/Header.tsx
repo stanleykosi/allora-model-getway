@@ -108,7 +108,7 @@ export default function Header() {
 
               {/* GitHub */}
               <a
-                href="https://github.com/allora-network/allora-mcp-node"
+                href="https://github.com/stanleykosi/allora-mcp"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface/50 transition-all duration-200 group"
@@ -222,7 +222,7 @@ export default function Header() {
               {/* Mobile GitHub Link */}
               <div className="pt-3 border-t border-border/50">
                 <a
-                  href="https://github.com/allora-network/allora-mcp-node"
+                  href="https://github.com/stanleykosi/allora-mcp"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface/50 transition-colors"

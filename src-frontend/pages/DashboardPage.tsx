@@ -14,13 +14,14 @@ import {
   Target,
   Zap,
   Globe,
-  Award
+  Award,
+  LayoutDashboard
 } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { useApi } from '@/hooks/useApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import AlloraIcon from '../components/icons/AlloraIcon';
+
 
 export default function DashboardPage() {
   console.log('🎯 DashboardPage component is rendering!');
@@ -91,8 +92,8 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-              <AlloraIcon className="h-6 w-6 text-primary" />
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center">
+              <LayoutDashboard className="h-6 w-6 text-blue-500" />
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Dashboard
