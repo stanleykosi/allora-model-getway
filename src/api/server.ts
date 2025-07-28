@@ -37,40 +37,7 @@ const app: Express = express();
 // SECURITY FIX: Add comprehensive security headers
 app.use(helmet({
   // Enhanced Content Security Policy
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: config.NODE_ENV === 'development'
-        ? ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"]
-        : ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Allow inline styles for Clerk
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      scriptSrc: config.NODE_ENV === 'development'
-        ? ["'self'", "'unsafe-inline'", "'unsafe-eval'"] // React dev needs these
-        : ["'self'", "'unsafe-inline'", "https://*.clerk.com", "https://*.clerk.accounts.dev", "https://*.clerk.dev", "https://clerk.com", "https://clerk.accounts.dev", "https://clerk.dev", "https://clerk.*"], // Allow all Clerk scripts
-      connectSrc: [
-        "'self'",
-        "https://api.clerk.com",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://*.clerk.dev",
-        "https://clerk.com",
-        "https://clerk.accounts.dev",
-        "https://clerk.dev",
-        "https://clerk.*",
-        ...(config.NODE_ENV === 'development' ? ["ws:", "wss:"] : [])
-      ],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      frameAncestors: ["'none'"],
-      manifestSrc: ["'self'"],
-      mediaSrc: ["'self'"],
-      workerSrc: ["'self'", "blob:"],
-      upgradeInsecureRequests: config.NODE_ENV === 'production' ? [] : null
-    }
-  },
+  contentSecurityPolicy: false, // Temporarily disable CSP to test
   // HTTP Strict Transport Security
   hsts: {
     maxAge: 31536000, // 1 year
