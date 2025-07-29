@@ -5,7 +5,7 @@
     "buildCommand": "npm run build:full"
   },
   "deploy": {
-    "startCommand": "npm run serve",
+    "startCommand": "/app/start-with-vault.sh",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 30,
     "restartPolicyType": "ON_FAILURE",
