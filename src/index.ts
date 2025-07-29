@@ -30,15 +30,16 @@ const PORT = config.PORT;
  * @description
  * Loads the treasury mnemonic from Vault or environment variables into the secrets store.
  * This is required for the model registration process to work.
+ * @returns Promise<boolean> - true if mnemonic was loaded successfully, false otherwise
  */
-const loadTreasuryMnemonic = async () => {
+const loadTreasuryMnemonic = async (): Promise<boolean> => {
   try {
     // First try to load from Vault
     const vaultMnemonic = await secretsService.getSecret(config.TREASURY_MNEMONIC_SECRET_KEY);
 
     if (vaultMnemonic) {
       logger.info('✅ Treasury mnemonic loaded from Vault');
-      return;
+      return true;
     }
 
     // Fallback to environment variable if not in Vault
@@ -46,12 +47,14 @@ const loadTreasuryMnemonic = async () => {
     if (envMnemonic) {
       await secretsService.storeSecret(config.TREASURY_MNEMONIC_SECRET_KEY, envMnemonic);
       logger.info('✅ Treasury mnemonic loaded from environment variables and stored in Vault');
+      return true;
     } else {
       logger.warn('⚠️  Treasury mnemonic not found in Vault or environment variables. Model registration will fail.');
+      return false;
     }
   } catch (error) {
-    logger.error({ err: error }, '❌ Failed to load treasury mnemonic');
-    throw error;
+    logger.warn({ err: error }, '⚠️  Failed to load treasury mnemonic at startup. Vault may not be available yet. Model registration will fail until Vault is accessible.');
+    return false;
   }
 };
 
@@ -63,8 +66,12 @@ const loadTreasuryMnemonic = async () => {
  */
 const startServer = async () => {
   try {
-    // Load treasury mnemonic before starting the server
-    await loadTreasuryMnemonic();
+    // Try to load treasury mnemonic, but don't fail if it's not available
+    const treasuryLoaded = await loadTreasuryMnemonic();
+
+    if (!treasuryLoaded) {
+      logger.warn('⚠️  Server starting without treasury mnemonic. Model registration will be disabled until Vault is accessible.');
+    }
 
     app.listen(PORT, () => {
       logger.info(`🚀 Server is running on http://localhost:${PORT}`);
