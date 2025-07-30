@@ -155,131 +155,153 @@ export default function NetworkPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-surface/20">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-              <Network className="h-6 w-6 text-primary" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <Network className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Network Monitor
             </h1>
           </div>
-          <p className="text-lg text-text-secondary max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base md:text-lg text-text-secondary max-w-2xl mx-auto px-4">
             Monitor network activity, track predictions, and view worker status across all topics.
           </p>
         </div>
 
         {/* Network Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card className="border-0 shadow-xl bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-text-secondary mb-1">Active Topics</p>
-                  <p className="text-3xl font-bold text-primary">{topics.length}</p>
+                  <p className="text-xs sm:text-sm font-medium text-text-secondary mb-1">Active Topics</p>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">{topics.length}</p>
                   <p className="text-xs text-text-secondary mt-1">Prediction topics</p>
                 </div>
-                <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-                  <Target className="h-6 w-6 text-primary" />
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-primary/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Target className="h-5 sm:h-6 w-5 sm:w-6 text-primary" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-xl bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-text-secondary mb-1">Active Workers</p>
-                  <p className="text-3xl font-bold text-green-500">{totalWorkers}</p>
+                  <p className="text-xs sm:text-sm font-medium text-text-secondary mb-1">Active Workers</p>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold text-green-500">{totalWorkers}</p>
                   <p className="text-xs text-text-secondary mt-1">Network participants</p>
                 </div>
-                <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
-                  <Users className="h-6 w-6 text-green-500" />
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-green-500/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Users className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-xl bg-gradient-to-br from-accent/10 to-accent/5 backdrop-blur-sm">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-text-secondary mb-1">Recent Inferences</p>
-                  <p className="text-3xl font-bold text-accent">
+                  <p className="text-xs sm:text-sm font-medium text-text-secondary mb-1">Recent Inferences</p>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold text-accent">
                     {topicInferences?.inferences?.network_inferences?.inferer_values?.length || 0}
                   </p>
                   <p className="text-xs text-text-secondary mt-1">Latest predictions</p>
                 </div>
-                <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-accent" />
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-accent/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-accent" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 backdrop-blur-sm">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-text-secondary mb-1">Network Status</p>
-                  <p className="text-3xl font-bold text-purple-500">Active</p>
+                  <p className="text-xs sm:text-sm font-medium text-text-secondary mb-1">Network Status</p>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold text-purple-500">Active</p>
                   <p className="text-xs text-text-secondary mt-1">All systems operational</p>
                 </div>
-                <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                  <Activity className="h-6 w-6 text-purple-500" />
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-purple-500/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
           {/* Topics List */}
           <div className="lg:col-span-1">
             <Card className="border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
-              <CardHeader className="pb-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg flex items-center justify-center">
+              <CardHeader className="pb-4 sm:pb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Globe className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="text-2xl">Active Topics</CardTitle>
-                    <CardDescription className="text-base">
+                    <CardTitle className="text-xl sm:text-2xl">Active Topics</CardTitle>
+                    <CardDescription className="text-sm sm:text-base">
                       Select a topic to view detailed network activity
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {topics.map((topic: any) => (
-                    <div
-                      key={topic.id}
-                      className={`p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-lg ${selectedTopicId === topic.id
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/50 bg-surface/50'
-                        }`}
-                      onClick={() => setSelectedTopicId(topic.id)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
-                          <span className="text-sm font-bold text-primary">{topic.id}</span>
+                <div className="space-y-3 max-h-[60vh] lg:max-h-[calc(100vh-20rem)] overflow-y-auto px-2">
+                  {topics.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                        <Target className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-semibold text-text-primary mb-2 sm:mb-3">No Active Topics</h3>
+                      <p className="text-sm sm:text-base text-text-secondary mb-4 sm:mb-6 max-w-md mx-auto px-4 sm:px-0">
+                        There are currently no active prediction topics in the Allora network. Topics may become available as the network grows.
+                      </p>
+                      <div className="text-xs text-text-secondary bg-surface/30 rounded-lg p-3 max-w-sm mx-auto">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span>Network Status: Connected</span>
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-text-primary">{topic.metadata}</h4>
-                          <p className="text-xs text-text-secondary">
-                            {topic.epochLength || 0} blocks • {topic.isActive ? 'Active' : 'Inactive'}
-                          </p>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span>API Response: Success ({topicsData?.timestamp ? new Date(topicsData.timestamp).toLocaleTimeString() : 'Just now'})</span>
                         </div>
-                        {selectedTopicId === topic.id && (
-                          <CheckCircle className="h-5 w-5 text-primary" />
-                        )}
                       </div>
                     </div>
-                  ))}
+                  ) : (
+                    topics.map((topic: any) => (
+                      <div
+                        key={topic.id}
+                        className={`p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-lg ${selectedTopicId === topic.id
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50 bg-surface/50'
+                          }`}
+                        onClick={() => setSelectedTopicId(topic.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                            <span className="text-sm font-bold text-primary">{topic.id}</span>
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-text-primary">{topic.metadata}</h4>
+                            <p className="text-xs text-text-secondary">
+                              {topic.epochLength || 0} blocks • {topic.isActive ? 'Active' : 'Inactive'}
+                            </p>
+                          </div>
+                          {selectedTopicId === topic.id && (
+                            <CheckCircle className="h-5 w-5 text-primary" />
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -288,17 +310,17 @@ export default function NetworkPage() {
           {/* Topic Details */}
           <div className="lg:col-span-2">
             {selectedTopicId ? (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* Topic Overview */}
                 <Card className="border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
-                  <CardHeader className="pb-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-gradient-to-br from-accent/20 to-accent/10 rounded-lg flex items-center justify-center">
+                  <CardHeader className="pb-4 sm:pb-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-2">
+                      <div className="w-10 h-10 bg-gradient-to-br from-accent/20 to-accent/10 rounded-lg flex items-center justify-center flex-shrink-0">
                         <Target className="h-5 w-5 text-accent" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl">Topic {selectedTopicId} Details</CardTitle>
-                        <CardDescription className="text-base">
+                        <CardTitle className="text-xl sm:text-2xl">Topic {selectedTopicId} Details</CardTitle>
+                        <CardDescription className="text-sm sm:text-base">
                           Network activity and performance metrics
                         </CardDescription>
                       </div>
@@ -381,8 +403,8 @@ export default function NetworkPage() {
                         <Table>
                           <TableHeader>
                             <TableRow className="border-b border-border">
-                              <TableHead className="text-text-primary font-semibold">Worker Address</TableHead>
-                              <TableHead className="text-text-primary font-semibold">Type</TableHead>
+                              <TableHead className="text-text-primary font-semibold">Worker</TableHead>
+                              <TableHead className="text-text-primary font-semibold hidden sm:table-cell">Type</TableHead>
                               <TableHead className="text-text-primary font-semibold">Status</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -393,15 +415,18 @@ export default function NetworkPage() {
                                 <TableRow key={`inferer-${index}`} className="border-b border-border hover:bg-surface/50 transition-colors">
                                   <TableCell>
                                     <div className="flex items-center gap-2">
-                                      <div className="w-6 h-6 bg-blue-500/20 rounded flex items-center justify-center">
+                                      <div className="w-6 h-6 bg-blue-500/20 rounded flex items-center justify-center flex-shrink-0">
                                         <Zap className="h-3 w-3 text-blue-500" />
                                       </div>
-                                      <span className="font-mono text-sm">
-                                        {address.substring(0, 8)}...{address.substring(address.length - 8)}
-                                      </span>
+                                      <div className="min-w-0">
+                                        <span className="font-mono text-sm truncate block">
+                                          {address.substring(0, 6)}...{address.substring(address.length - 4)}
+                                        </span>
+                                        <span className="text-xs text-blue-500 sm:hidden">Inferer</span>
+                                      </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="hidden sm:table-cell">
                                     <span className="text-blue-500 font-medium">Inferer</span>
                                   </TableCell>
                                   <TableCell>
@@ -509,16 +534,16 @@ export default function NetworkPage() {
                       <div className="space-y-4">
                         {topicInferences.inferences.network_inferences.inferer_values.slice(0, 5).map((inference: any, index: number) => (
                           <div key={index} className="p-4 border border-border rounded-xl bg-surface/50 hover:bg-surface/80 transition-all">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2">
+                              <div className="flex items-center gap-3 mb-2 sm:mb-0">
+                                <div className="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center flex-shrink-0">
                                   <Zap className="h-4 w-4 text-accent" />
                                 </div>
                                 <span className="font-medium text-text-primary">
                                   Inference #{index + 1}
                                 </span>
                               </div>
-                              <span className="text-sm text-text-secondary">
+                              <span className="text-sm text-text-secondary self-end sm:self-center">
                                 Block {topicInferences.inferences.inference_block_height}
                               </span>
                             </div>
@@ -528,7 +553,7 @@ export default function NetworkPage() {
                               </div>
                               {inference.worker && (
                                 <div className="text-sm text-text-secondary">
-                                  Worker: {inference.worker.substring(0, 8)}...{inference.worker.substring(inference.worker.length - 8)}
+                                  Worker: <span className="font-mono">{inference.worker.substring(0, 6)}...{inference.worker.substring(inference.worker.length - 4)}</span>
                                 </div>
                               )}
                             </div>

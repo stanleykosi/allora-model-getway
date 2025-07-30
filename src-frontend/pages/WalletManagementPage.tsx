@@ -122,18 +122,18 @@ export default function WalletManagementPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-surface/20">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-              <Wallet className="h-6 w-6 text-primary" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <Wallet className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Wallet Management
             </h1>
           </div>
-          <p className="text-lg text-text-secondary max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base md:text-lg text-text-secondary max-w-2xl mx-auto px-4 sm:px-0">
             Manage your wallet credentials, view balances, and track your model performance.
           </p>
         </div>
@@ -142,44 +142,44 @@ export default function WalletManagementPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* User Profile */}
           <Card className="border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
-            <CardHeader className="pb-6">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
+            <CardHeader className="pb-4 sm:pb-6">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-accent/20 rounded-md sm:rounded-lg flex items-center justify-center">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">User Profile</CardTitle>
-                  <CardDescription className="text-base">
+                  <CardTitle className="text-lg sm:text-xl md:text-2xl">User Profile</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm md:text-base">
                     Your account information and details
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl flex items-center justify-center">
-                  <User className="h-8 w-8 text-primary" />
+            <CardContent className="space-y-3 sm:space-y-4">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl sm:rounded-2xl flex items-center justify-center">
+                  <User className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-text-primary">
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold text-text-primary">
                     {user?.firstName} {user?.lastName}
                   </h3>
-                  <p className="text-text-secondary">{user?.emailAddresses?.[0]?.emailAddress}</p>
-                  <p className="text-xs text-text-secondary mt-1">
+                  <p className="text-sm sm:text-base text-text-secondary">{user?.emailAddresses?.[0]?.emailAddress}</p>
+                  <p className="text-xs text-text-secondary mt-0.5 sm:mt-1">
                     User ID: {user?.id}
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 pt-4">
-                <div className="p-3 bg-surface/50 rounded-lg">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 pt-2 sm:pt-4">
+                <div className="p-2 sm:p-3 bg-surface/50 rounded-lg">
                   <p className="text-xs text-text-secondary">Created</p>
-                  <p className="font-medium text-text-primary">
+                  <p className="text-sm sm:text-base font-medium text-text-primary">
                     {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
-                <div className="p-3 bg-surface/50 rounded-lg">
+                <div className="p-2 sm:p-3 bg-surface/50 rounded-lg">
                   <p className="text-xs text-text-secondary">Last Sign In</p>
-                  <p className="font-medium text-text-primary">
+                  <p className="text-sm sm:text-base font-medium text-text-primary">
                     {user?.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
@@ -189,62 +189,62 @@ export default function WalletManagementPage() {
 
           {/* Account Overview */}
           <Card className="border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
-            <CardHeader className="pb-6">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-accent/20 to-accent/10 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="h-5 w-5 text-accent" />
+            <CardHeader className="pb-4 sm:pb-6">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-accent/20 to-accent/10 rounded-md sm:rounded-lg flex items-center justify-center">
+                  <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">Account Overview</CardTitle>
-                  <CardDescription className="text-base">
+                  <CardTitle className="text-lg sm:text-xl md:text-2xl">Account Overview</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm md:text-base">
                     Your model and wallet statistics
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
-                      <Target className="h-4 w-4 text-primary" />
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg sm:rounded-xl">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary/20 rounded-md sm:rounded-lg flex items-center justify-center">
+                      <Target className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-text-secondary">Registered Models</p>
-                      <p className="text-2xl font-bold text-primary">{models.length}</p>
+                      <p className="text-xs sm:text-sm font-medium text-text-secondary">Registered Models</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary">{models.length}</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-xl">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-                      <Zap className="h-4 w-4 text-green-500" />
+                <div className="p-3 sm:p-4 bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-lg sm:rounded-xl">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-500/20 rounded-md sm:rounded-lg flex items-center justify-center">
+                      <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-text-secondary">Active Models</p>
-                      <p className="text-2xl font-bold text-green-500">{activeModels.length}</p>
+                      <p className="text-xs sm:text-sm font-medium text-text-secondary">Active Models</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-500">{activeModels.length}</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">
-                      <Wallet className="h-4 w-4 text-accent" />
+                <div className="p-3 sm:p-4 bg-gradient-to-br from-accent/10 to-accent/5 rounded-lg sm:rounded-xl">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-accent/20 rounded-md sm:rounded-lg flex items-center justify-center">
+                      <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-accent" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-text-secondary">Total Wallets</p>
-                      <p className="text-2xl font-bold text-accent">{wallets.length}</p>
+                      <p className="text-xs sm:text-sm font-medium text-text-secondary">Total Wallets</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-accent">{wallets.length}</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-xl">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                      <Network className="h-4 w-4 text-purple-500" />
+                <div className="p-3 sm:p-4 bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-lg sm:rounded-xl">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-500/20 rounded-md sm:rounded-lg flex items-center justify-center">
+                      <Network className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-text-secondary">Topics</p>
-                      <p className="text-2xl font-bold text-purple-500">
+                      <p className="text-xs sm:text-sm font-medium text-text-secondary">Topics</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-500">
                         {new Set(models.map((m: any) => m.topic_id)).size}
                       </p>
                     </div>
@@ -257,14 +257,14 @@ export default function WalletManagementPage() {
 
         {/* Wallet Information */}
         <Card className="border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
-          <CardHeader className="pb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500/20 to-green-500/10 rounded-lg flex items-center justify-center">
-                <Shield className="h-5 w-5 text-green-500" />
+          <CardHeader className="pb-4 sm:pb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-500/20 to-green-500/10 rounded-md sm:rounded-lg flex items-center justify-center">
+                <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
               </div>
               <div>
-                <CardTitle className="text-2xl">Wallet Information</CardTitle>
-                <CardDescription className="text-base">
+                <CardTitle className="text-lg sm:text-xl md:text-2xl">Wallet Information</CardTitle>
+                <CardDescription className="text-xs sm:text-sm md:text-base">
                   {wallets.length} wallet{wallets.length !== 1 && 's'} registered for your models
                 </CardDescription>
               </div>
@@ -272,17 +272,17 @@ export default function WalletManagementPage() {
           </CardHeader>
           <CardContent>
             {walletError ? (
-              <div className="text-center py-12">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <Wallet className="h-10 w-10 text-primary" />
+              <div className="text-center py-8 sm:py-12">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                  <Wallet className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold text-text-primary mb-3">No Wallet Registered</h3>
-                <p className="text-text-secondary mb-6 max-w-md mx-auto">
+                <h3 className="text-lg sm:text-xl font-semibold text-text-primary mb-2 sm:mb-3">No Wallet Registered</h3>
+                <p className="text-sm text-text-secondary mb-4 sm:mb-6 max-w-md mx-auto px-4 sm:px-0">
                   You haven't registered any models yet. Register your first model to get a dedicated wallet with funding.
                 </p>
                 <Link to="/models/register">
-                  <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-12 px-8">
-                    <Plus className="h-5 w-5 mr-2" />
+                  <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-10 sm:h-12 px-6 sm:px-8 text-sm sm:text-base">
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2" />
                     Register Your First Model
                   </Button>
                 </Link>

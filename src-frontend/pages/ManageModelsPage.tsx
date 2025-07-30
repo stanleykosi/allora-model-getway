@@ -167,130 +167,130 @@ export default function ManageModelsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-surface/20">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-              <Settings className="h-6 w-6 text-primary" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Manage Models
             </h1>
           </div>
-          <p className="text-lg text-text-secondary max-w-2xl mx-auto">
+          <p className="text-sm sm:text-md md:text-lg text-text-secondary max-w-2xl mx-auto px-4 sm:px-0">
             View and manage all your registered models across the Allora Network.
           </p>
         </div>
 
         {/* Header Actions */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-text-secondary" />
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <div className="flex flex-col md:flex-row items-center gap-3 sm:gap-4 w-full">
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-text-secondary" />
               <input
                 type="text"
-                placeholder="Search models by ID, topic, or type..."
+                placeholder="Search models..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-3 w-80 bg-surface border-2 border-border rounded-xl focus:border-primary transition-all"
+                className="pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-3 text-sm w-full bg-surface border-2 border-border rounded-lg sm:rounded-xl focus:border-primary transition-all"
               />
             </div>
             <div className="flex gap-2">
               <Button
                 variant={statusFilter === 'all' ? 'default' : 'outline'}
                 onClick={() => setStatusFilter('all')}
-                className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-xs sm:text-sm py-1.5 sm:py-2 h-auto px-2 sm:px-3"
               >
                 All
               </Button>
               <Button
                 variant={statusFilter === 'active' ? 'default' : 'outline'}
                 onClick={() => setStatusFilter('active')}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-500/90 hover:to-green-600/90"
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-500/90 hover:to-green-600/90 text-xs sm:text-sm py-1.5 sm:py-2 h-auto px-2 sm:px-3"
               >
                 Active
               </Button>
               <Button
                 variant={statusFilter === 'inactive' ? 'default' : 'outline'}
                 onClick={() => setStatusFilter('inactive')}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-500/90 hover:to-purple-600/90"
+                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-500/90 hover:to-purple-600/90 text-xs sm:text-sm py-1.5 sm:py-2 h-auto px-2 sm:px-3"
               >
                 Inactive
               </Button>
             </div>
           </div>
-          <Link to="/models/register">
-            <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-12 px-6">
-              <Plus className="h-5 w-5 mr-2" />
+          <Link to="/models/register" className="w-full md:w-auto">
+            <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-10 sm:h-12 px-4 sm:px-6 w-full text-sm sm:text-base">
+              <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2" />
               Register New Model
             </Button>
           </Link>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card className="border-0 shadow-xl bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-text-secondary mb-1">Total Models</p>
-                  <p className="text-3xl font-bold text-primary">{models.length}</p>
+                  <p className="text-xs sm:text-sm font-medium text-text-secondary mb-1">Total Models</p>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">{models.length}</p>
                   <p className="text-xs text-text-secondary mt-1">Registered models</p>
                 </div>
-                <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-                  <BarChart3 className="h-6 w-6 text-primary" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-xl bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-text-secondary mb-1">Active Models</p>
-                  <p className="text-3xl font-bold text-green-500">
+                  <p className="text-xs sm:text-sm font-medium text-text-secondary mb-1">Active Models</p>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold text-green-500">
                     {models.filter((m: any) => m.is_active).length}
                   </p>
                   <p className="text-xs text-text-secondary mt-1">Currently running</p>
                 </div>
-                <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
-                  <ToggleRight className="h-6 w-6 text-green-500" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-500/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <ToggleRight className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 backdrop-blur-sm">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-text-secondary mb-1">Inactive Models</p>
-                  <p className="text-3xl font-bold text-purple-500">
+                  <p className="text-xs sm:text-sm font-medium text-text-secondary mb-1">Inactive Models</p>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold text-purple-500">
                     {models.filter((m: any) => !m.is_active).length}
                   </p>
                   <p className="text-xs text-text-secondary mt-1">Paused models</p>
                 </div>
-                <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                  <ToggleLeft className="h-6 w-6 text-purple-500" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-500/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <ToggleLeft className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-xl bg-gradient-to-br from-accent/10 to-accent/5 backdrop-blur-sm">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-text-secondary mb-1">Topics</p>
-                  <p className="text-3xl font-bold text-accent">
+                  <p className="text-xs sm:text-sm font-medium text-text-secondary mb-1">Topics</p>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold text-accent">
                     {new Set(models.map((m: any) => m.topic_id)).size}
                   </p>
                   <p className="text-xs text-text-secondary mt-1">Active topics</p>
                 </div>
-                <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center">
-                  <Network className="h-6 w-6 text-accent" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-accent/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Network className="h-5 w-5 sm:h-6 sm:w-6 text-accent" />
                 </div>
               </div>
             </CardContent>
@@ -299,14 +299,14 @@ export default function ManageModelsPage() {
 
         {/* Models Table */}
         <Card className="border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
-          <CardHeader className="pb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg flex items-center justify-center">
-                <Target className="h-5 w-5 text-primary" />
+          <CardHeader className="pb-4 sm:pb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-accent/20 rounded-md sm:rounded-lg flex items-center justify-center">
+                <Target className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-2xl">Your Models</CardTitle>
-                <CardDescription className="text-base">
+                <CardTitle className="text-lg sm:text-xl md:text-2xl">Your Models</CardTitle>
+                <CardDescription className="text-sm sm:text-base">
                   You have {filteredModels.length} model{filteredModels.length !== 1 && 's'}
                   {searchTerm && ` matching "${searchTerm}"`}
                   {statusFilter !== 'all' && ` (${statusFilter})`}
@@ -316,20 +316,20 @@ export default function ManageModelsPage() {
           </CardHeader>
           <CardContent>
             {filteredModels.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <Target className="h-10 w-10 text-primary" />
+              <div className="text-center py-8 sm:py-12">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                  <Target className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold text-text-primary mb-3">No models found</h3>
-                <p className="text-text-secondary mb-6 max-w-md mx-auto">
+                <h3 className="text-lg sm:text-xl font-semibold text-text-primary mb-2 sm:mb-3">No models found</h3>
+                <p className="text-sm text-text-secondary mb-4 sm:mb-6 max-w-md mx-auto px-4 sm:px-0">
                   {searchTerm || statusFilter !== 'all'
                     ? 'No models match your filters. Try adjusting your search or filter criteria.'
                     : 'You haven\'t registered any models yet. Get started by registering your first model.'}
                 </p>
                 {!searchTerm && statusFilter === 'all' && (
                   <Link to="/models/register">
-                    <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-12 px-8">
-                      <Plus className="h-5 w-5 mr-2" />
+                    <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-10 sm:h-12 px-6 sm:px-8 text-sm sm:text-base">
+                      <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2" />
                       Register Your First Model
                     </Button>
                   </Link>
@@ -340,11 +340,10 @@ export default function ManageModelsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-b border-border">
-                      <TableHead className="text-text-primary font-semibold">Model ID</TableHead>
-                      <TableHead className="text-text-primary font-semibold">Topic</TableHead>
-                      <TableHead className="text-text-primary font-semibold">Type</TableHead>
+                      <TableHead className="text-text-primary font-semibold">Model</TableHead>
+                      <TableHead className="text-text-primary font-semibold hidden md:table-cell">Topic</TableHead>
+                      <TableHead className="text-text-primary font-semibold hidden lg:table-cell">Type</TableHead>
                       <TableHead className="text-text-primary font-semibold">Status</TableHead>
-                      <TableHead className="text-text-primary font-semibold">Gas Price Limit</TableHead>
                       <TableHead className="text-right text-text-primary font-semibold">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -353,12 +352,12 @@ export default function ManageModelsPage() {
                       <TableRow key={model.id} className="border-b border-border hover:bg-surface/50 transition-colors">
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                            <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center flex-shrink-0">
                               <Target className="h-4 w-4 text-primary" />
                             </div>
                             <div>
                               <span className="font-mono text-sm font-medium">
-                                {model.id.substring(0, 8)}...{model.id.substring(model.id.length - 8)}
+                                {model.id.substring(0, 8)}...
                               </span>
                               <Button
                                 variant="ghost"
@@ -371,7 +370,7 @@ export default function ManageModelsPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 bg-accent/20 rounded flex items-center justify-center">
                               <span className="text-xs font-bold text-accent">{model.topic_id}</span>
@@ -379,7 +378,7 @@ export default function ManageModelsPage() {
                             <span className="font-medium text-text-primary">Topic {model.topic_id}</span>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden lg:table-cell">
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 bg-green-500/20 rounded flex items-center justify-center">
                               <Zap className="h-3 w-3 text-green-500" />
@@ -395,9 +394,6 @@ export default function ManageModelsPage() {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-text-secondary">{model.max_gas_price || 'Not set'}</span>
-                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button
@@ -406,8 +402,8 @@ export default function ManageModelsPage() {
                               onClick={() => handleViewPerformance(model)}
                               className="hover:bg-primary hover:text-white transition-all"
                             >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
+                              <Eye className="h-4 w-4" />
+                              <span className="hidden sm:inline ml-1">View</span>
                             </Button>
                             <Button
                               variant={model.is_active ? "outline" : "default"}
@@ -415,21 +411,21 @@ export default function ManageModelsPage() {
                               onClick={() => handleStatusToggle(model)}
                               disabled={activateMutation.isPending || deactivateMutation.isPending}
                               className={`${model.is_active
-                                  ? 'hover:bg-red-500 hover:text-white'
-                                  : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-500/90 hover:to-green-600/90'
+                                ? 'hover:bg-red-500 hover:text-white'
+                                : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-500/90 hover:to-green-600/90'
                                 } transition-all`}
                             >
                               {activateMutation.isPending || deactivateMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                               ) : model.is_active ? (
                                 <>
-                                  <ToggleLeft className="h-4 w-4 mr-1" />
-                                  Deactivate
+                                  <ToggleLeft className="h-4 w-4" />
+                                  <span className="hidden sm:inline ml-1">Deactivate</span>
                                 </>
                               ) : (
                                 <>
-                                  <ToggleRight className="h-4 w-4 mr-1" />
-                                  Activate
+                                  <ToggleRight className="h-4 w-4" />
+                                  <span className="hidden sm:inline ml-1">Activate</span>
                                 </>
                               )}
                             </Button>
