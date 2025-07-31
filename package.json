@@ -18,7 +18,11 @@
     "serve:dev": "node dist/index.js | pino-pretty",
     "dev": "vite",
     "preview": "vite preview",
-    "test": "DOTENV_CONFIG_PATH=.env.local ts-node -r dotenv/config -r tsconfig-paths/register node_modules/.bin/jest --runInBand"
+    "test": "DOTENV_CONFIG_PATH=.env.local ts-node -r dotenv/config -r tsconfig-paths/register node_modules/.bin/jest --runInBand",
+    "migrate:rls": "node scripts/apply-rls-policies.js",
+    "test:rls": "node scripts/test-rls-policies.js",
+    "verify:rls": "node scripts/verify-rls-deployment.js",
+    "setup:security": "npm run migrate:rls && npm run verify:rls"
   },
   "keywords": [
     "allora",
