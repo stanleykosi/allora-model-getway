@@ -39,11 +39,16 @@ import { Input } from '@/components/ui/Input';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import AlloraIcon from '../components/icons/AlloraIcon';
 
+// New Zod schema
 const registerModelSchema = z.object({
   webhook_url: z.string().url({ message: "Must be a valid URL." }),
   topic_id: z.string().min(1, { message: "Topic ID is required." }),
-  model_type: z.enum(['inference', 'forecaster']),
+  is_inferer: z.boolean().default(true),
+  is_forecaster: z.boolean().default(false),
   max_gas_price: z.string().optional(),
+}).refine(data => data.is_inferer || data.is_forecaster, {
+  message: "Model must be at least an inferer or a forecaster.",
+  path: ["is_inferer"], // Assign error to one of the fields
 });
 
 export default function RegisterModelPage() {
@@ -66,9 +71,15 @@ export default function RegisterModelPage() {
     return data;
   };
 
-  const { data: topicsData, isLoading: isLoadingTopics } = useQuery({
+  const { data: topicsData, isLoading: isLoadingTopics, error: topicsError } = useQuery({
     queryKey: ['activeTopics'],
     queryFn: fetchActiveTopics,
+    onSuccess: (data) => {
+      console.log('✅ Topics fetched successfully:', data);
+    },
+    onError: (error) => {
+      console.error('❌ Failed to fetch topics:', error);
+    },
   });
 
   const {
@@ -101,17 +112,16 @@ export default function RegisterModelPage() {
   };
 
   const selectedTopic = topicsData?.topics?.find(t => t.id === watchedValues.topic_id);
-  const selectedModelType = watchedValues.model_type;
 
   // Auto-advance steps based on form completion
   useEffect(() => {
     if (watchedValues.topic_id && currentStep === 1) {
       setTimeout(() => setCurrentStep(2), 300);
     }
-    if (watchedValues.model_type && currentStep === 2) {
+    if ((watchedValues.is_inferer || watchedValues.is_forecaster) && currentStep === 2) {
       setTimeout(() => setCurrentStep(3), 300);
     }
-  }, [watchedValues.topic_id, watchedValues.model_type, currentStep]);
+  }, [watchedValues.topic_id, watchedValues.is_inferer, watchedValues.is_forecaster, currentStep]);
 
   // Webhook URL validation
   useEffect(() => {
@@ -141,7 +151,7 @@ export default function RegisterModelPage() {
 
   const steps = [
     { number: 1, title: 'Select Topic', description: 'Choose prediction category', icon: Target },
-    { number: 2, title: 'Model Type', description: 'Define model behavior', icon: Activity },
+    { number: 2, title: 'Model Capabilities', description: 'Define model behavior', icon: Activity },
     { number: 3, title: 'Configuration', description: 'Setup connection', icon: Settings },
     { number: 4, title: 'Review', description: 'Confirm & deploy', icon: CheckCircle }
   ];
@@ -337,81 +347,59 @@ export default function RegisterModelPage() {
                     )}
                   </div>
 
-                  {/* Step 2: Model Type Selection */}
+                  {/* Step 2: Model Capabilities */}
                   <div className={`transition-all duration-500 ${currentStep >= 2 ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-8 h-8 bg-gradient-to-br from-accent/30 to-accent/10 rounded-lg flex items-center justify-center">
                         <span className="text-sm font-bold text-accent">2</span>
                       </div>
-                      <h3 className="text-xl font-semibold text-text-primary">Model Type</h3>
+                      <h3 className="text-xl font-semibold text-text-primary">Model Capabilities</h3>
                       <div className="flex-1 h-px bg-gradient-to-r from-border/50 to-transparent" />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[
-                        {
-                          value: 'inference',
-                          label: 'Inference Model',
-                          description: 'Real-time predictions with immediate results',
-                          icon: Zap,
-                          color: 'from-blue-500/20 to-blue-600/10',
-                          iconColor: 'text-blue-500'
-                        },
-                        {
-                          value: 'forecaster',
-                          label: 'Forecaster Model',
-                          description: 'Future predictions with time-based analysis',
-                          icon: TrendingUp,
-                          color: 'from-purple-500/20 to-purple-600/10',
-                          iconColor: 'text-purple-500'
-                        }
-                      ].map((type) => {
-                        const Icon = type.icon;
-                        const isSelected = selectedModelType === type.value;
-
-                        return (
-                          <div
-                            key={type.value}
-                            className={`group relative p-6 rounded-2xl cursor-pointer transition-all duration-300 ${isSelected
-                              ? `bg-gradient-to-br ${type.color} border-2 border-opacity-40 shadow-lg`
-                              : 'bg-surface/80 border-2 border-border/30 hover:border-border/60 hover:bg-surface/90'
-                              }`}
-                            onClick={() => setValue('model_type', type.value as 'inference' | 'forecaster')}
-                          >
-                            <div className="flex items-start gap-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${isSelected
-                                ? `bg-gradient-to-br ${type.color} shadow-md`
-                                : 'bg-surface border border-border/50 group-hover:border-border'
-                                }`}>
-                                <Icon className={`h-6 w-6 ${isSelected ? type.iconColor : 'text-text-secondary group-hover:text-primary'} transition-colors`} />
-                              </div>
-                              <div className="flex-1">
-                                <h4 className={`text-lg font-semibold transition-colors ${isSelected ? 'text-text-primary' : 'text-text-primary group-hover:text-primary'
-                                  }`}>
-                                  {type.label}
-                                </h4>
-                                <p className="text-sm text-text-secondary mt-1">{type.description}</p>
-                                {isSelected && (
-                                  <div className="flex items-center gap-2 mt-3">
-                                    <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                                      <Check className="h-3 w-3 text-white" />
-                                    </div>
-                                    <span className="text-sm font-medium text-primary">Selected</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            {isSelected && (
-                              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-accent/5 pointer-events-none" />
-                            )}
+                    <div className="space-y-4">
+                      <div className="p-6 rounded-2xl border-2 border-border/30 bg-surface/80">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-xl flex items-center justify-center">
+                            <Zap className="h-6 w-6 text-blue-500" />
                           </div>
-                        );
-                      })}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                {...register('is_inferer')}
+                                className="w-5 h-5 text-primary bg-surface border-2 border-border rounded focus:ring-primary focus:ring-2"
+                              />
+                              <h4 className="text-lg font-semibold text-text-primary">Inference Model</h4>
+                            </div>
+                            <p className="text-sm text-text-secondary mt-1 ml-8">Generate real-time predictions with immediate results</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-6 rounded-2xl border-2 border-border/30 bg-surface/80">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-xl flex items-center justify-center">
+                            <TrendingUp className="h-6 w-6 text-purple-500" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                {...register('is_forecaster')}
+                                className="w-5 h-5 text-primary bg-surface border-2 border-border rounded focus:ring-primary focus:ring-2"
+                              />
+                              <h4 className="text-lg font-semibold text-text-primary">Forecaster Model</h4>
+                            </div>
+                            <p className="text-sm text-text-secondary mt-1 ml-8">Generate forecasts for other workers' performance</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    {errors.model_type && (
+                    {errors.is_inferer && (
                       <div className="flex items-center gap-3 mt-4 p-4 bg-error/10 border border-error/20 rounded-xl">
                         <AlertCircle className="h-5 w-5 text-error flex-shrink-0" />
-                        <span className="text-error font-medium">{errors.model_type.message}</span>
+                        <span className="text-error font-medium">{errors.is_inferer.message}</span>
                       </div>
                     )}
                   </div>
@@ -577,22 +565,34 @@ export default function RegisterModelPage() {
                   </div>
                 )}
 
-                {selectedModelType ? (
-                  <div className="p-4 bg-gradient-to-r from-accent/10 to-accent/5 rounded-xl border border-accent/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Activity className="h-4 w-4 text-accent" />
-                      <span className="text-sm font-semibold text-accent">Model Type</span>
+                {(() => {
+                  const capabilityLabel = (watchedValues.is_inferer && watchedValues.is_forecaster)
+                    ? 'Inference + Forecast'
+                    : watchedValues.is_inferer
+                      ? 'Inference'
+                      : watchedValues.is_forecaster
+                        ? 'Forecast'
+                        : null;
+
+                  return capabilityLabel ? (
+                    <div className="p-4 bg-gradient-to-r from-accent/10 to-accent/5 rounded-xl border border-accent/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Activity className="h-4 w-4 text-accent" />
+                        <span className="text-sm font-semibold text-accent">Model Capabilities</span>
+                      </div>
+                      <p className="text-sm font-medium text-text-primary">{capabilityLabel}</p>
+                      <p className="text-xs text-text-secondary">
+                        {(capabilityLabel.includes('Inference') ? 'Real-time predictions' : '')}
+                        {(capabilityLabel.includes('Inference') && capabilityLabel.includes('Forecast') ? ' • ' : '')}
+                        {(capabilityLabel.includes('Forecast') ? 'Forecasts for other workers' : '')}
+                      </p>
                     </div>
-                    <p className="text-sm font-medium text-text-primary capitalize">{selectedModelType}</p>
-                    <p className="text-xs text-text-secondary">
-                      {selectedModelType === 'inference' ? 'Real-time predictions' : 'Future forecasting'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-surface/50 rounded-xl border border-border/30 border-dashed">
-                    <p className="text-sm text-text-secondary">No model type selected</p>
-                  </div>
-                )}
+                  ) : (
+                    <div className="p-4 bg-surface/50 rounded-xl border border-border/30 border-dashed">
+                      <p className="text-sm text-text-secondary">No capabilities selected</p>
+                    </div>
+                  );
+                })()}
 
                 {watchedValues.webhook_url ? (
                   <div className="p-4 bg-gradient-to-r from-green-500/10 to-green-500/5 rounded-xl border border-green-500/20">

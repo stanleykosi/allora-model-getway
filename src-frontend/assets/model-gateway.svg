@@ -1,0 +1,40 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 320' role='img' aria-label='Model Gateway logo'>
+  <defs>
+    <linearGradient id='g1' x1='0%' y1='0%' x2='100%' y2='0%'>
+      <stop offset='0%' stop-color='#6D28D9'/>
+      <stop offset='50%' stop-color='#4F46E5'/>
+      <stop offset='100%' stop-color='#06B6D4'/>
+    </linearGradient>
+    <linearGradient id='g2' x1='0%' y1='0%' x2='0%' y2='100%'>
+      <stop offset='0%' stop-color='rgba(255,255,255,0.9)'/>
+      <stop offset='100%' stop-color='rgba(255,255,255,0.3)'/>
+    </linearGradient>
+    <filter id='glow' x='-50%' y='-50%' width='200%' height='200%'>
+      <feGaussianBlur stdDeviation='8' result='b'/>
+      <feMerge><feMergeNode in='b'/><feMergeNode in='SourceGraphic'/></feMerge>
+    </filter>
+    <clipPath id='badge-clip'>
+      <rect x='40' y='40' width='240' height='240' rx='32' ry='32'/>
+    </clipPath>
+  </defs>
+
+  <rect width='100%' height='100%' fill='none'/>
+
+  <!-- Abstract "M" + gateway arc mark -->
+  <g transform='translate(0,0)'>
+    <g clip-path='url(#badge-clip)'>
+      <rect x='40' y='40' width='240' height='240' rx='32' fill='none'/>
+      <g transform='translate(40,40)'>
+        <path d='M40 200 L100 60 L160 200' fill='none' stroke='url(#g1)' stroke-width='18' stroke-linecap='round'/>
+        <path d='M160 200 L220 60 L280 200' fill='none' stroke='url(#g1)' stroke-width='18' stroke-linecap='round' opacity='0.75'/>
+        <!-- Gateway arc -->
+        <path d='M60 150 C140 60, 220 60, 300 150' fill='none' stroke='#22D3EE' stroke-width='6' stroke-linecap='round' opacity='0.9'/>
+        <circle cx='60' cy='150' r='4' fill='#22D3EE'/>
+        <circle cx='300' cy='150' r='4' fill='#22D3EE'/>
+        <!-- Subtle diagonal sheen -->
+        <rect x='0' y='0' width='280' height='240' fill='url(#g2)' opacity='0.06' transform='skewX(-12)'/>
+      </g>
+    </g>
+    <rect x='40' y='40' width='240' height='240' rx='32' ry='32' fill='none' stroke='url(#g1)' stroke-width='2' opacity='0.7'/>
+  </g>
+</svg>

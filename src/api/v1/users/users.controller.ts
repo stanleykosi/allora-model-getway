@@ -137,7 +137,8 @@ export const getUserWalletPhraseHandler = async (req: Request, res: Response) =>
 
       walletPhrases.push({
         model_id: model.id,
-        model_type: model.model_type,
+        is_inferer: model.is_inferer,
+        is_forecaster: model.is_forecaster,
         topic_id: model.topic_id,
         wallet_id: wallet.id,
         wallet_address: wallet.address,
@@ -215,7 +216,8 @@ export const getUserModelsHandler = async (req: Request, res: Response) => {
       user_id: userId,
       models: models.map(model => ({
         id: model.id,
-        model_type: model.model_type,
+        is_inferer: model.is_inferer,
+        is_forecaster: model.is_forecaster,
         topic_id: model.topic_id,
         webhook_url: model.webhook_url,
         max_gas_price: model.max_gas_price,

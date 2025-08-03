@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import AlloraIcon from '../components/icons/AlloraIcon';
+import LogoUrl from '@/assets/model-gateway-tight.svg';
 
 export default function LandingPage() {
   const [isVisible, setIsVisible] = useState(false);
@@ -104,8 +105,8 @@ export default function LandingPage() {
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center">
               <Link to="/" className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-primary via-accent to-purple-500 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-primary/30 shadow-lg shadow-primary/20 hover:scale-105 transition-all duration-300">
-                  <AlloraIcon className="h-6 w-6 text-white" />
+                <div className="w-12 h-12 rounded-2xl overflow-hidden border border-primary/30 shadow-lg shadow-primary/20 hover:scale-105 transition-all duration-300 bg-surface/50">
+                  <img src={LogoUrl} alt="Model Gateway" className="w-full h-full object-contain p-1" />
                 </div>
                 <span className="text-xl font-bold bg-gradient-to-r from-primary via-accent to-purple-500 bg-clip-text text-transparent hidden sm:block">
                   Model Gateway
@@ -349,8 +350,8 @@ export default function LandingPage() {
 
               <CardHeader className="relative pt-8 sm:pt-12">
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl flex items-center justify-center">
-                    <AlloraIcon className="h-6 w-6 text-primary" />
+                  <div className="w-12 h-12 rounded-xl overflow-hidden border border-primary/20 bg-surface/40 flex items-center justify-center">
+                    <img src={LogoUrl} alt="Model Gateway" className="w-10 h-10 object-contain p-1" />
                   </div>
                   <CardTitle className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                     Ready to get started?
@@ -399,8 +400,8 @@ export default function LandingPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 md:gap-8">
             <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary via-accent to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center">
-                <AlloraIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl overflow-hidden border border-primary/20 bg-surface/40 flex items-center justify-center">
+                <img src={LogoUrl} alt="Model Gateway" className="w-8 h-8 object-contain p-1" />
               </div>
               <div>
                 <h3 className="text-lg sm:text-xl font-bold text-text-primary">Model Gateway</h3>

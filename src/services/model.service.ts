@@ -31,7 +31,8 @@ export interface ModelRegistrationData {
   userId: string;
   webhookUrl: string;
   topicId: string;
-  modelType: 'inference' | 'forecaster';
+  isInferer: boolean;
+  isForecaster: boolean;
   maxGasPrice?: string;
 }
 
@@ -103,8 +104,8 @@ class ModelService {
     // Step 4: Persist the model's metadata to the database.
     try {
       const modelQuery = `
-        INSERT INTO models (user_id, wallet_id, webhook_url, topic_id, model_type, max_gas_price)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO models (user_id, wallet_id, webhook_url, topic_id, is_inferer, is_forecaster, max_gas_price)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id;
       `;
       const modelValues = [
@@ -112,7 +113,8 @@ class ModelService {
         newWallet.id,
         data.webhookUrl,
         data.topicId,
-        data.modelType,
+        data.isInferer,
+        data.isForecaster,
         data.maxGasPrice,
       ];
       const result = await pool.query<{ id: string }>(modelQuery, modelValues);
@@ -193,7 +195,7 @@ class ModelService {
 
     try {
       const query = `
-        SELECT id, user_id, wallet_id, webhook_url, topic_id, model_type, max_gas_price, is_active, created_at, updated_at
+        SELECT id, user_id, wallet_id, webhook_url, topic_id, is_inferer, is_forecaster, max_gas_price, is_active, created_at, updated_at
         FROM models
         WHERE user_id = $1
         ORDER BY created_at DESC

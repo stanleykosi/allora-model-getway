@@ -170,15 +170,15 @@ export const getActiveTopicsHandler = async (req: Request, res: Response) => {
 
     log.info('Fetching active topics from Allora network');
 
-    const activeTopics = await alloraConnectorService.getActiveTopics();
+    const { topics } = await alloraConnectorService.getActiveTopics();
 
     const response = {
-      topics: activeTopics,
-      count: activeTopics.length,
+      topics,
+      count: topics.length,
       timestamp: new Date().toISOString()
     };
 
-    log.info({ topicCount: activeTopics.length }, 'Successfully retrieved active topics');
+    log.info({ topicCount: topics.length }, 'Successfully retrieved active topics');
     res.json(response);
 
   } catch (error: any) {

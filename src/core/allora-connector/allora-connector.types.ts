@@ -36,35 +36,11 @@ export interface AlloraBalance {
   amount: string;
 }
 
-/**
- * @interface InferenceData
- * @description Represents the data structure expected from a model's webhook response.
- * The core information is the predicted `value`.
- */
-export interface InferenceData {
-  value: string;
-}
 
-/**
- * @interface Inference
- * @description Defines the structure of the inference to be included in the
- * MsgInsertInference transaction payload.
- */
-export interface Inference {
-  topic_id: string;
-  block_height: string;
-  value: string;
-}
 
-/**
- * @interface MsgInsertInference
- * @description Represents the structure of the custom message for submitting an inference
- * to the Allora chain's `emissions` module.
- */
-export interface MsgInsertInference {
-  sender: string;
-  inferences: Inference[];
-}
+
+
+
 
 
 /**
@@ -108,4 +84,63 @@ export interface AlloraWorkerPerformance {
   workerAddress: string;
   emaScore: string;
   // other future performance metrics can be added here
-} 
+}
+
+// =================================================================
+// START: NEW OFFICIAL PAYLOAD STRUCTURES (ALIGNMENT V2)
+// These types mirror the official Go structs for worker submissions.
+// =================================================================
+
+/**
+ * @interface WorkerResponsePayload
+ * @description Defines the new expected payload from a data scientist's model webhook.
+ * A model can now return both an inference and forecasts.
+ */
+export interface WorkerResponsePayload {
+  inferenceValue: string;
+  forecasts?: Array<{
+    workerAddress: string;
+    forecastedValue: string;
+  }>;
+}
+
+export interface InputForecastElement {
+  inferer: string; // Address of the worker being forecasted
+  value: string;   // The forecasted loss for that worker
+}
+
+export interface InputForecast {
+  topic_id: string;
+  block_height: string;
+  forecaster: string; // Our worker's address
+  forecast_elements: InputForecastElement[];
+}
+
+export interface InputInference {
+  topic_id: string;
+  block_height: string;
+  inferer: string; // Our worker's address
+  value: string;
+}
+
+/**
+ * @interface InputInferenceForecastBundle
+ * @description The core data structure that gets serialized and signed by the worker's key.
+ */
+export interface InputInferenceForecastBundle {
+  inference: InputInference | null;
+  forecast: InputForecast | null;
+}
+
+/**
+ * @interface InputWorkerDataBundle
+ * @description The final, top-level wrapper that includes the signed bundle and signature.
+ * This is the direct payload for the `MsgInsertWorkerPayload`.
+ */
+export interface InputWorkerDataBundle {
+  worker: string;
+  inference_forecasts_bundle: InputInferenceForecastBundle;
+  inference_forecasts_bundle_signature: string; // Hex-encoded signature
+  pubkey: string; // Hex-encoded public key
+}
+

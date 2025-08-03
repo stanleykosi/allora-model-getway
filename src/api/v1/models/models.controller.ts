@@ -59,7 +59,8 @@ export const registerModelHandler = async (req: Request, res: Response) => {
       userId: req.user.id,
       webhookUrl: validatedBody.webhook_url,
       topicId: validatedBody.topic_id,
-      modelType: validatedBody.model_type,
+      isInferer: validatedBody.is_inferer,
+      isForecaster: validatedBody.is_forecaster,
       maxGasPrice: validatedBody.max_gas_price,
     };
 
@@ -313,7 +314,7 @@ export const deactivateModelHandler = async (req: Request, res: Response) => {
 
     // Step 2: Verify the model belongs to the user
     const modelQuery = `
-      SELECT id, topic_id, model_type, is_active, created_at
+      SELECT id, topic_id, is_active, created_at
       FROM models
       WHERE id = $1 AND user_id = $2
     `;
@@ -333,7 +334,6 @@ export const deactivateModelHandler = async (req: Request, res: Response) => {
         model: {
           id: model.id,
           topic_id: model.topic_id,
-          model_type: model.model_type,
           is_active: false
         }
       });
@@ -344,7 +344,7 @@ export const deactivateModelHandler = async (req: Request, res: Response) => {
       UPDATE models 
       SET is_active = false, updated_at = NOW() 
       WHERE id = $1 AND user_id = $2
-      RETURNING id, topic_id, model_type, is_active, updated_at
+      RETURNING id, topic_id, is_active, updated_at
     `;
     const deactivateResult = await pool.query(deactivateQuery, [modelId, userId]);
 
@@ -388,7 +388,7 @@ export const activateModelHandler = async (req: Request, res: Response) => {
 
     // Step 2: Verify the model belongs to the user
     const modelQuery = `
-      SELECT id, topic_id, model_type, is_active, created_at
+      SELECT id, topic_id, is_active, created_at
       FROM models
       WHERE id = $1 AND user_id = $2
     `;
@@ -408,7 +408,6 @@ export const activateModelHandler = async (req: Request, res: Response) => {
         model: {
           id: model.id,
           topic_id: model.topic_id,
-          model_type: model.model_type,
           is_active: true
         }
       });
@@ -419,7 +418,7 @@ export const activateModelHandler = async (req: Request, res: Response) => {
       UPDATE models 
       SET is_active = true, updated_at = NOW() 
       WHERE id = $1 AND user_id = $2
-      RETURNING id, topic_id, model_type, is_active, updated_at
+      RETURNING id, topic_id, is_active, updated_at
     `;
     const activateResult = await pool.query(activateQuery, [modelId, userId]);
 

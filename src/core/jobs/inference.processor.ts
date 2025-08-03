@@ -20,25 +20,16 @@ import logger from '@/utils/logger';
 import pool from '@/persistence/postgres.client';
 import secretsService from '@/core/secrets/secrets.service';
 import alloraConnectorService from '@/core/allora-connector/allora-connector.service';
-import { InferenceData } from '../allora-connector/allora-connector.types';
+import { WorkerResponsePayload } from '../allora-connector/allora-connector.types';
 
-// The default gas price to use if a model does not have one specified.
 const DEFAULT_GAS_PRICE = '10uallo';
 
-/**
- * @interface InferenceJobData
- * @description Defines the structure of the data expected in an inference job.
- */
 export interface InferenceJobData {
   modelId: string;
   webhookUrl: string;
   topicId: string;
 }
 
-/**
- * @interface ModelAndWallet
- * @description Defines the structure of the data returned from the database query.
- */
 interface ModelAndWallet {
   walletId: string;
   secretRef: string;
@@ -47,22 +38,26 @@ interface ModelAndWallet {
 
 /**
  * Fetches the prediction from the data scientist's model webhook.
- * Implements a simple retry mechanism.
+ * It now provides active worker addresses to the webhook for forecasting.
  * @param webhookUrl The URL to call.
- * @returns A promise resolving to the inference data.
+ * @param activeWorkers Addresses of other workers on the topic.
+ * @returns A promise resolving to the new WorkerResponsePayload.
  */
-const getInferenceFromWebhook = async (webhookUrl: string): Promise<InferenceData> => {
+const getInferenceFromWebhook = async (webhookUrl: string, activeWorkers: string[]): Promise<WorkerResponsePayload> => {
   const log = logger.child({ method: 'getInferenceFromWebhook', webhookUrl });
   try {
-    const response = await axios.post<InferenceData>(
+    // The webhook is now sent the list of active workers to forecast against
+    const response = await axios.post<WorkerResponsePayload>(
       webhookUrl,
-      {},
+      { activeWorkers },
       { timeout: 10000 } // 10-second timeout
     );
-    if (response.status !== 200 || !response.data.value) {
-        throw new Error(`Webhook returned status ${response.status} or invalid data.`);
+
+    if (response.status !== 200 || !response.data.inferenceValue) {
+      throw new Error(`Webhook returned status ${response.status} or is missing 'inferenceValue'.`);
     }
-    log.info({ responseData: response.data }, 'Successfully received inference from webhook.');
+
+    log.info({ hasForecasts: !!response.data.forecasts }, 'Successfully received payload from webhook.');
     return response.data;
   } catch (error) {
     log.error({ err: error }, 'Failed to get inference from model webhook.');
@@ -70,13 +65,8 @@ const getInferenceFromWebhook = async (webhookUrl: string): Promise<InferenceDat
   }
 };
 
-/**
- * Retrieves the necessary model and wallet details from the database.
- * @param modelId The ID of the model.
- * @returns A promise resolving to the combined model and wallet data.
- */
 const getModelAndWalletDetails = async (modelId: string): Promise<ModelAndWallet> => {
-    const query = `
+  const query = `
       SELECT
         m.wallet_id as "walletId",
         w.secret_ref as "secretRef",
@@ -85,56 +75,59 @@ const getModelAndWalletDetails = async (modelId: string): Promise<ModelAndWallet
       JOIN wallets w ON m.wallet_id = w.id
       WHERE m.id = $1;
     `;
-    const result = await pool.query<ModelAndWallet>(query, [modelId]);
-    if (result.rows.length === 0) {
-      throw new Error(`No model found with ID: ${modelId}`);
-    }
-    return result.rows[0];
+  const result = await pool.query<ModelAndWallet>(query, [modelId]);
+  if (result.rows.length === 0) {
+    throw new Error(`No model found with ID: ${modelId}`);
+  }
+  return result.rows[0];
 };
 
 /**
  * @function inferenceProcessor
- * @description The main function for processing an inference job.
- * @param job The BullMQ job object containing the payload.
+ * @description The main function for processing an inference job under the new V2 standard.
  */
 const inferenceProcessor = async (job: Job<InferenceJobData>): Promise<void> => {
   const { modelId, webhookUrl, topicId } = job.data;
-  const log = logger.child({ module: 'InferenceProcessor', jobId: job.id, modelId, topicId });
+  const log = logger.child({ module: 'InferenceProcessorV2', jobId: job.id, modelId, topicId });
 
-  log.info('Starting processing of inference job.');
+  log.info('Starting processing of V2 inference job.');
 
   try {
-    // 1. Fetch the inference prediction from the model's webhook.
-    const inferenceData = await getInferenceFromWebhook(webhookUrl);
+    // 1. Get active inferers on the topic for forecasting purposes.
+    const activeInferers = await alloraConnectorService.getActiveInferers(topicId);
+    const activeWorkerAddresses = Object.keys(activeInferers || {});
+    log.info({ count: activeWorkerAddresses.length }, 'Fetched active workers for topic.');
 
-    // 2. Retrieve model and wallet details from the database.
+    // 2. Fetch the inference and forecasts from the model's webhook.
+    const workerResponse = await getInferenceFromWebhook(webhookUrl, activeWorkerAddresses);
+
+    // 3. Retrieve model and wallet details from the database.
     const details = await getModelAndWalletDetails(modelId);
     log.info({ walletId: details.walletId }, 'Retrieved model and wallet details.');
 
-    // 3. Securely retrieve the wallet's mnemonic from the secrets service.
+    // 4. Securely retrieve the wallet's mnemonic.
     const mnemonic = await secretsService.getSecret(details.secretRef);
     if (!mnemonic) {
       throw new Error(`Mnemonic not found for secret ref: ${details.secretRef}`);
     }
     log.info('Retrieved wallet mnemonic securely.');
 
-    // 4. Submit the inference to the Allora blockchain.
+    // 5. Submit the new, comprehensive payload to the blockchain.
     const gasPrice = details.maxGasPrice || DEFAULT_GAS_PRICE;
-    const submissionResult = await alloraConnectorService.submitInference(
+    const submissionResult = await alloraConnectorService.submitWorkerPayload(
       mnemonic,
       topicId,
-      inferenceData,
+      workerResponse,
       gasPrice
     );
 
     if (!submissionResult) {
-      throw new Error('Failed to submit inference to the blockchain after all retries.');
+      throw new Error('Failed to submit worker payload to the blockchain after all retries.');
     }
 
-    log.info({ txHash: submissionResult.txHash }, 'Inference successfully submitted to the chain.');
+    log.info({ txHash: submissionResult.txHash }, 'Worker payload successfully submitted to the chain.');
   } catch (error) {
-    log.error({ err: error }, 'An error occurred during inference job processing.');
-    // Re-throw the error to let BullMQ handle the job failure and retry.
+    log.error({ err: error }, 'An error occurred during V2 inference job processing.');
     throw error;
   }
 };

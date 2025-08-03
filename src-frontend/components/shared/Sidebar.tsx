@@ -18,7 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import AlloraIcon from '../icons/AlloraIcon';
+import LogoUrl from '@/assets/model-gateway-tight.svg';
 
 const navLinks = [
   {
@@ -141,8 +141,8 @@ export default function Sidebar() {
             <div className="relative mb-6 sm:mb-8">
               <div className={`flex items-center gap-2 sm:gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
                 <div className="relative flex-shrink-0">
-                  <div className={`${isCollapsed ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-10 h-10 sm:w-12 sm:h-12'} bg-gradient-to-br from-primary via-accent to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center backdrop-blur-sm border border-primary/30 shadow-lg shadow-primary/20`}>
-                    <AlloraIcon className={`${isCollapsed ? 'h-3.5 w-3.5 sm:h-4 sm:w-4' : 'h-5 w-5 sm:h-6 sm:w-6'} text-white`} />
+                  <div className={`${isCollapsed ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-10 h-10 sm:w-12 sm:h-12'} rounded-xl sm:rounded-2xl overflow-hidden border border-primary/30 shadow-lg shadow-primary/20 bg-surface/50`}>
+                    <img src={LogoUrl} alt="Model Gateway" className="w-full h-full object-contain p-1" />
                   </div>
                 </div>
                 {!isCollapsed && (

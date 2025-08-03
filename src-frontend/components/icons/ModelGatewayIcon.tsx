@@ -1,0 +1,48 @@
+import React from 'react';
+
+interface ModelGatewayIconProps {
+  className?: string;
+  size?: number;
+}
+
+export const ModelGatewayIcon: React.FC<ModelGatewayIconProps> = ({
+  className = "",
+  size = 24
+}) => {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 320 320"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Model Gateway mark"
+      className={className}
+    >
+      <defs>
+        <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#6D28D9" />
+          <stop offset="50%" stopColor="#4F46E5" />
+          <stop offset="100%" stopColor="#06B6D4" />
+        </linearGradient>
+        <linearGradient id="g2" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.9)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0.3)" />
+        </linearGradient>
+      </defs>
+
+      {/* Mark area is tightly fit to 320x320 */}
+      <rect x="40" y="40" width="240" height="240" rx="32" ry="32" fill="none" stroke="url(#g1)" strokeWidth="2" opacity="0.7" />
+      <g transform="translate(40,40)">
+        <path d="M40 200 L100 60 L160 200" fill="none" stroke="url(#g1)" strokeWidth="18" strokeLinecap="round" />
+        <path d="M160 200 L220 60 L280 200" fill="none" stroke="url(#g1)" strokeWidth="18" strokeLinecap="round" opacity="0.75" />
+        <path d="M60 150 C140 60, 220 60, 300 150" fill="none" stroke="#22D3EE" strokeWidth="6" strokeLinecap="round" opacity="0.9" />
+        <circle cx="60" cy="150" r="4" fill="#22D3EE" />
+        <circle cx="300" cy="150" r="4" fill="#22D3EE" />
+        <rect x="0" y="0" width="280" height="240" fill="url(#g2)" opacity="0.06" transform="skewX(-12)" />
+      </g>
+    </svg>
+  );
+};
+
+export default ModelGatewayIcon; 

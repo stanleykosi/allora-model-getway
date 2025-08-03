@@ -32,10 +32,12 @@ export const registerModelSchema = z.object({
     }).min(1, {
       message: 'topic_id cannot be empty',
     }),
-    model_type: z.enum(['inference', 'forecaster'], {
-      required_error: 'model_type is required and must be either "inference" or "forecaster"',
-    }),
+    is_inferer: z.boolean().default(true),
+    is_forecaster: z.boolean().default(false),
     max_gas_price: z.string().optional(),
+  }).refine(data => data.is_inferer || data.is_forecaster, {
+    message: "Model must be at least an inferer or a forecaster.",
+    path: ["is_inferer"],
   }),
 });
 

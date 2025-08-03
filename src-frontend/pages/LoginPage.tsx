@@ -1,7 +1,7 @@
 import React from 'react';
 import { SignIn } from '@clerk/clerk-react';
 import { Github, Lock, Zap, Globe } from 'lucide-react';
-import AlloraIcon from '../components/icons/AlloraIcon';
+import LogoUrl from '@/assets/model-gateway-tight.svg';
 
 export default function LoginPage() {
   return (
@@ -13,8 +13,10 @@ export default function LoginPage() {
       <div className="flex flex-col justify-center items-center min-h-screen p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-md space-y-6 sm:space-y-8 z-10">
           <div className="text-center">
-            <a href="/" className="inline-block p-2 sm:p-3 bg-gradient-to-br from-primary via-accent to-purple-500 rounded-xl sm:rounded-2xl shadow-lg shadow-primary/25 mb-3 sm:mb-4 hover:scale-105 transition-transform duration-300">
-              <AlloraIcon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+            <a href="/" className="inline-block mb-3 sm:mb-4 hover:scale-105 transition-transform duration-300">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl overflow-hidden border border-primary/30 shadow-lg shadow-primary/20 bg-surface/50">
+                <img src={LogoUrl} alt="Model Gateway" className="w-full h-full object-contain p-1" />
+              </div>
             </a>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Welcome to Model Gateway

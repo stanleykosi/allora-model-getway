@@ -18,7 +18,8 @@ export interface UserRegistrationResponse {
 export interface ModelRegistrationData {
   webhook_url: string;
   topic_id: string;
-  model_type: 'inference' | 'forecaster';
+  is_inferer: boolean;
+  is_forecaster: boolean;
   max_gas_price?: string;
 }
 

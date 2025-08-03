@@ -302,7 +302,7 @@ export default function DashboardPage() {
                             Model {model.id.substring(0, 8)}...
                           </h4>
                           <p className="text-sm text-text-secondary">
-                            Topic {model.topic_id} • {model.model_type}
+                            Topic {model.topic_id} • {model.is_inferer ? 'Inferer' : ''}{model.is_inferer && model.is_forecaster ? ' + ' : ''}{model.is_forecaster ? 'Forecaster' : ''}
                           </p>
                         </div>
                       </div>

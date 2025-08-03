@@ -124,11 +124,12 @@ export default function ManageModelsPage() {
 
     // Apply search filter
     if (searchTerm) {
-      models = models.filter((model: any) =>
-        model.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        model.topic_id?.toString().includes(searchTerm) ||
-        model.model_type?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      models = models.filter((model: any) => {
+        const modelType = `${model.is_inferer ? 'inferer' : ''}${model.is_inferer && model.is_forecaster ? ' ' : ''}${model.is_forecaster ? 'forecaster' : ''}`.trim();
+        return model.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          model.topic_id?.toString().includes(searchTerm) ||
+          modelType.toLowerCase().includes(searchTerm.toLowerCase());
+      });
     }
 
     return models;
@@ -383,7 +384,9 @@ export default function ManageModelsPage() {
                             <div className="w-6 h-6 bg-green-500/20 rounded flex items-center justify-center">
                               <Zap className="h-3 w-3 text-green-500" />
                             </div>
-                            <span className="capitalize font-medium text-text-primary">{model.model_type}</span>
+                            <span className="capitalize font-medium text-text-primary">
+                              {model.is_inferer ? 'Inferer' : ''}{model.is_inferer && model.is_forecaster ? ' + ' : ''}{model.is_forecaster ? 'Forecaster' : ''}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>

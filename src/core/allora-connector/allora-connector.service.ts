@@ -30,24 +30,31 @@ import {
   defaultRegistryTypes
 } from '@cosmjs/stargate';
 import { DirectSecp256k1HdWallet, Registry, EncodeObject } from '@cosmjs/proto-signing';
+import { Secp256k1, sha256 } from '@cosmjs/crypto';
+import { EnglishMnemonic, Bip39, Slip10, Slip10Curve, Slip10RawIndex } from '@cosmjs/crypto';
 import * as yaml from 'js-yaml';
+import stableStringify from 'canonical-json';
 import { config } from '@/config';
 import logger from '@/utils/logger';
 import {
-  AlloraTopic,
   AlloraBalance,
   TopicDetails,
   ExecResult,
-  InferenceData,
-  MsgInsertInference,
   AlloraWorkerPerformance,
-  AlloraEmaScore
+  AlloraEmaScore,
+  InputInference,
+  InputForecast,
+  InputInferenceForecastBundle,
+  InputForecastElement,
+  WorkerResponsePayload,
+  InputWorkerDataBundle
 } from './allora-connector.types';
 
 const execAsync = promisify(exec);
 
-// Define the type URL for our custom message. This must match the definition on the Allora chain.
+// Define the type URLs for our custom messages. These must match the definitions on the Allora chain.
 const msgInsertInferenceTypeUrl = "/emissions.v1.MsgInsertInferences";
+const msgInsertWorkerPayloadTypeUrl = "/emissions.v1.MsgInsertWorkerPayload";
 
 class AlloraConnectorService {
   private readonly MAX_RETRIES = 3;
@@ -69,22 +76,35 @@ class AlloraConnectorService {
       registry.register(key, value as any);
     });
 
-    // Register our custom message type for inserting inferences.
-    // NOTE: The protobuf encoding/decoding logic for `MsgInsertInference` is simplified
+    // Register our custom message types for inserting inferences and worker payloads.
+    // NOTE: The protobuf encoding/decoding logic is simplified
     // here because the actual .proto files are not available. In a real-world scenario,
     // these would be generated from the chain's protobuf definitions.
     registry.register(msgInsertInferenceTypeUrl, {
-      encode: (message: MsgInsertInference, writer: any) => {
+      encode: (message: any, writer: any) => {
         // This is a simplified mock of protobuf encoding.
         const encoded = {
           sender: message.sender,
-          inferences: message.inferences.map(inf => ({
+          inferences: message.inferences.map((inf: any) => ({
             topic_id: inf.topic_id,
             block_height: inf.block_height,
             value: inf.value
           }))
         };
         writer.writeString(JSON.stringify(encoded));
+        return writer;
+      },
+      decode: (reader: any, length: any) => {
+        const json = reader.readString(length);
+        return JSON.parse(json);
+      },
+      fromPartial: (object: any) => object,
+    });
+
+    registry.register(msgInsertWorkerPayloadTypeUrl, {
+      encode: (message: any, writer: any) => {
+        // This is a simplified mock of protobuf encoding for worker payloads.
+        writer.writeString(JSON.stringify(message));
         return writer;
       },
       decode: (reader: any, length: any) => {
@@ -387,7 +407,7 @@ class AlloraConnectorService {
   public async submitInference(
     signingMnemonic: string,
     topicId: string,
-    inferenceData: InferenceData,
+    inferenceData: { value: string },
     gasPrice: string
   ): Promise<{ txHash: string } | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'submitInference', topicId });
@@ -408,7 +428,7 @@ class AlloraConnectorService {
         const latestBlock = await client.getBlock();
 
         // Construct the custom message payload
-        const msg: MsgInsertInference = {
+        const msg = {
           sender: senderAddress,
           inferences: [{
             topic_id: topicId,
@@ -566,42 +586,187 @@ class AlloraConnectorService {
   }
 
   /**
-   * Get all active topics from the Allora network
+ * Submit a worker payload (inference and forecasts) to the Allora blockchain using V2 format
+ */
+  public async submitWorkerPayload(
+    signingMnemonic: string,
+    topicId: string,
+    workerResponse: WorkerResponsePayload,
+    gasPrice: string
+  ): Promise<{ txHash: string } | null> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'submitWorkerPayload', topicId });
+    let delay = this.INITIAL_DELAY_MS;
+
+    for (let i = 0; i < this.MAX_RETRIES; i++) {
+      try {
+        log.info({ attempt: i + 1, topicId }, 'Attempting to submit worker payload.');
+
+        const wallet = await DirectSecp256k1HdWallet.fromMnemonic(signingMnemonic, { prefix: 'allo' });
+        const [account] = await wallet.getAccounts();
+        const senderAddress = account.address;
+
+        const client = await SigningStargateClient.connectWithSigner(config.ALLORA_RPC_URL, wallet, {
+          gasPrice: GasPrice.fromString(gasPrice),
+        });
+
+        const latestBlock = await client.getBlock();
+        const currentBlockHeight = latestBlock.header.height.toString();
+
+        // Construct the inference payload
+        const inference: InputInference = {
+          topic_id: topicId,
+          block_height: currentBlockHeight,
+          inferer: senderAddress,
+          value: workerResponse.inferenceValue,
+        };
+
+        // Construct the forecast payload if forecasts are provided
+        let forecast: InputForecast | null = null;
+        if (workerResponse.forecasts && workerResponse.forecasts.length > 0) {
+          const forecastElements: InputForecastElement[] = workerResponse.forecasts.map(f => ({
+            inferer: f.workerAddress,
+            value: f.forecastedValue,
+          }));
+
+          forecast = {
+            topic_id: topicId,
+            block_height: currentBlockHeight,
+            forecaster: senderAddress,
+            forecast_elements: forecastElements,
+          };
+        }
+
+        // Create the bundle
+        const bundle: InputInferenceForecastBundle = {
+          inference: inference,
+          forecast: forecast,
+        };
+
+        // Sign the bundle
+        const serializedBundle = stableStringify(bundle);
+        const messageBytes = new TextEncoder().encode(serializedBundle);
+        const messageHash = sha256(messageBytes);
+
+        // Derive private key from mnemonic
+        const mnemonic = new EnglishMnemonic(signingMnemonic);
+        const seed = await Bip39.mnemonicToSeed(mnemonic);
+        const path = [
+          Slip10RawIndex.hardened(44),
+          Slip10RawIndex.hardened(118),
+          Slip10RawIndex.hardened(0),
+          Slip10RawIndex.normal(0),
+          Slip10RawIndex.normal(0),
+        ];
+        const { privkey: privateKey } = Slip10.derivePath(Slip10Curve.Secp256k1, seed, path);
+
+        // Sign the hash
+        const signature = await Secp256k1.createSignature(messageHash, privateKey);
+        const fixedSignature = new Uint8Array([...signature.r(32), ...signature.s(32)]);
+        const pubKey = (await Secp256k1.makeKeypair(privateKey)).pubkey;
+
+        // Create the final worker data bundle
+        const workerDataBundle: InputWorkerDataBundle = {
+          worker: senderAddress,
+          inference_forecasts_bundle: bundle,
+          inference_forecasts_bundle_signature: Buffer.from(fixedSignature).toString('hex'),
+          pubkey: Buffer.from(pubKey).toString('hex'),
+        };
+
+        // Create the message for blockchain submission
+        const message: EncodeObject = {
+          typeUrl: msgInsertWorkerPayloadTypeUrl,
+          value: workerDataBundle,
+        };
+
+        const fee = {
+          amount: [], // Fee calculated from gas limit and price
+          gas: this.INFERENCE_GAS_LIMIT,
+        };
+
+        log.debug({ message, fee }, "Broadcasting worker payload transaction");
+        const result = await client.signAndBroadcast(senderAddress, [message], fee, `Submitting worker payload for topic ${topicId}`);
+
+        if (isDeliverTxFailure(result)) {
+          throw new Error(`Worker payload transaction failed: ${result.rawLog}`);
+        }
+
+        log.info({ txHash: result.transactionHash, topicId }, 'Worker payload submission successful.');
+        return { txHash: result.transactionHash };
+
+      } catch (error) {
+        log.error({ err: error, attempt: i + 1 }, `Attempt ${i + 1} to submit worker payload failed.`);
+        if (i === this.MAX_RETRIES - 1) {
+          return null;
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get all active topics from the Allora network that are available for contribution at the current block height
    */
-  public async getActiveTopics(): Promise<any[]> {
+  public async getActiveTopics(): Promise<{ topics: Array<{ id: string; metadata: string }> }> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'getActiveTopics' });
 
     try {
       log.info('Fetching active topics from Allora network');
 
-      // We'll need to query multiple topics to find active ones
-      // For now, let's check topics 1-10 (common range)
-      const activeTopics = [];
+      // Get the current block height
+      const blockCommand = `allorad query block --node ${config.ALLORA_RPC_URL}`;
+      const [blockStdout, blockError] = await this.execAsyncWithRetry(blockCommand);
 
-      for (let topicId = 1; topicId <= 10; topicId++) {
-        try {
-          const topicDetails = await this.getTopicDetails(topicId.toString());
-          if (topicDetails && topicDetails.isActive) {
-            activeTopics.push({
-              id: topicDetails.id,
-              epochLength: topicDetails.epochLength,
-              creator: topicDetails.creator,
-              isActive: topicDetails.isActive,
-              metadata: topicDetails.metadata
-            });
-          }
-        } catch (error) {
-          // Skip topics that don't exist or have errors
-          continue;
-        }
+      if (blockError) {
+        log.error({ err: blockError }, 'Failed to get current block height.');
+        return { topics: [] };
       }
 
-      log.info({ activeTopicsCount: activeTopics.length }, 'Successfully retrieved active topics');
-      return activeTopics;
+      // Parse the current block height
+      const blockMatch = blockStdout!.match(/height: "(\d+)"/);
+      if (!blockMatch) {
+        log.error('Failed to parse block height from output:', blockStdout);
+        return { topics: [] };
+      }
+
+      const currentBlockHeight = parseInt(blockMatch[1]);
+      log.info({ currentBlockHeight }, 'Found current block height');
+
+      // Get active topics at the current block height (only topics available for contribution)
+      const activeTopicsCommand = `allorad query emissions active-topics-at-block ${currentBlockHeight} --node ${config.ALLORA_RPC_URL}`;
+      const [activeTopicsStdout, activeTopicsError] = await this.execAsyncWithRetry(activeTopicsCommand);
+
+      if (activeTopicsError) {
+        log.error({ err: activeTopicsError }, 'Failed to get active topics at current block height.');
+        return { topics: [] };
+      }
+
+      // Parse the YAML output for active topics
+      try {
+        const activeTopicsData = yaml.load(activeTopicsStdout!) as any;
+        const topics = activeTopicsData.topics || [];
+
+        const formattedTopics = topics.map((topic: any) => ({
+          id: String(topic.id),
+          metadata: String(topic.metadata || `Topic ${topic.id}`)
+        }));
+
+        log.info({
+          currentBlockHeight,
+          activeTopicsCount: formattedTopics.length
+        }, 'Successfully retrieved active topics available for contribution');
+
+        return { topics: formattedTopics };
+
+      } catch (parseError) {
+        log.error({ err: parseError, activeTopicsStdout }, 'Failed to parse active topics response.');
+        return { topics: [] };
+      }
 
     } catch (error: any) {
       log.error({ err: error }, 'Failed to get active topics');
-      return [];
+      return { topics: [] };
     }
   }
 }
