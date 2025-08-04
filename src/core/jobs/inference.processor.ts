@@ -112,6 +112,29 @@ const inferenceProcessor = async (job: Job<InferenceJobData>): Promise<void> => 
     }
     log.info('Retrieved wallet mnemonic securely.');
 
+    // 4.1 Gate by topic window and nonce before submitting
+    const topicInfo = await alloraConnectorService.getTopicInfo(String(topicId));
+    const currentHeight = await alloraConnectorService.getCurrentBlockHeight();
+    if (!topicInfo || currentHeight == null) {
+      log.info({ topicInfo, currentHeight }, 'Skipping submission: missing topic info or current height');
+      return; // Skip this run; scheduler will try later
+    }
+    const windowStart = topicInfo.epochLastEnded + 1;
+    const windowEnd = topicInfo.epochLastEnded + topicInfo.workerSubmissionWindow;
+    const inWindow = currentHeight >= windowStart && currentHeight <= windowEnd;
+    log.info({ currentHeight, windowStart, windowEnd, inWindow }, 'Worker submission window check');
+    if (!inWindow) {
+      log.info('Not in worker submission window; skipping this attempt');
+      return;
+    }
+
+    const nonceHeight = await alloraConnectorService.deriveLatestOpenWorkerNonce(String(topicId));
+    log.info({ nonceHeight }, 'Derived latest open worker nonce');
+    if (nonceHeight == null) {
+      log.info('No open nonce found in current window; skipping');
+      return;
+    }
+
     // 5. Submit the new, comprehensive payload to the blockchain.
     const gasPrice = details.maxGasPrice || DEFAULT_GAS_PRICE;
     const submissionResult = await alloraConnectorService.submitWorkerPayload(
@@ -125,7 +148,7 @@ const inferenceProcessor = async (job: Job<InferenceJobData>): Promise<void> => 
       throw new Error('Failed to submit worker payload to the blockchain after all retries.');
     }
 
-    log.info({ txHash: submissionResult.txHash }, 'Worker payload successfully submitted to the chain.');
+    log.info({ txHash: submissionResult.txHash, nonceHeight }, 'Worker payload successfully submitted to the chain.');
   } catch (error) {
     log.error({ err: error }, 'An error occurred during V2 inference job processing.');
     throw error;

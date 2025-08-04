@@ -156,7 +156,7 @@ class AlloraConnectorService {
           env: {
             ...process.env,
             ALLORA_CHAIN_ID: config.CHAIN_ID,
-            ALLORA_RPC_URL: config.ALLORA_RPC_URL
+            ALLORA_RPC_URL: config.ALLORA_RPC_URL,
           }
         });
         logger.debug({ stdout, stderr, command }, 'Allorad command completed');
@@ -205,7 +205,7 @@ class AlloraConnectorService {
    * @returns A promise resolving to TopicDetails or null if not found/error.
    */
   public async getTopicDetails(topicId: string): Promise<TopicDetails | null> {
-    const getTopicCmd = `allorad query emissions topic ${topicId} --node ${config.ALLORA_RPC_URL}`;
+    const getTopicCmd = `allorad query emissions topic ${topicId}`;
     const [topicStdout, topicErr] = await this.execAsyncWithRetry(getTopicCmd);
 
     if (topicErr) {
@@ -213,7 +213,7 @@ class AlloraConnectorService {
       return null;
     }
 
-    const isActiveCmd = `allorad query emissions is-topic-active ${topicId} --output json --node ${config.ALLORA_RPC_URL}`;
+    const isActiveCmd = `allorad query emissions is-topic-active ${topicId}`;
     const [activeStdout, activeErr] = await this.execAsyncWithRetry(isActiveCmd);
 
     if (activeErr) {
@@ -223,8 +223,21 @@ class AlloraConnectorService {
 
     try {
       // Parse the isActive response (JSON)
-      const isActiveData = JSON.parse(activeStdout!);
-      const isActive = typeof isActiveData === 'boolean' ? isActiveData : isActiveData.is_active;
+      // Try YAML/text first; some nodes may not return JSON
+      let isActive = false;
+      try {
+        const activeYaml: any = yaml.load(activeStdout!);
+        const raw = activeYaml?.is_topic_active ?? activeYaml?.active ?? activeYaml?.value ?? activeYaml?.result;
+        if (typeof raw === 'boolean') isActive = raw;
+        else if (typeof raw === 'string') isActive = raw.toLowerCase() === 'true';
+      } catch {}
+      // Fallback: JSON parse if applicable
+      if (!isActive) {
+        try {
+          const isActiveData = JSON.parse(activeStdout!);
+          isActive = typeof isActiveData === 'boolean' ? isActiveData : Boolean(isActiveData.is_active ?? isActiveData.value);
+        } catch {}
+      }
 
       // Parse the topic response using proper YAML parser
       const topicData = yaml.load(topicStdout!.trim()) as any;
@@ -478,7 +491,7 @@ class AlloraConnectorService {
     try {
       log.info('Fetching latest network inferences from Allora network');
 
-      const command = `allorad query emissions latest-network-inferences ${topicId} --node ${config.ALLORA_RPC_URL}`;
+      const command = `allorad query emissions latest-network-inferences ${topicId}`;
       const [stdout, error] = await this.execAsyncWithRetry(command);
 
       if (error) {
@@ -507,7 +520,7 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active inferers from Allora network');
 
-      const command = `allorad query emissions active-inferers ${topicId} --node ${config.ALLORA_RPC_URL}`;
+      const command = `allorad query emissions active-inferers ${topicId}`;
       const [stdout, error] = await this.execAsyncWithRetry(command);
 
       if (error) {
@@ -536,7 +549,7 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active forecasters from Allora network');
 
-      const command = `allorad query emissions active-forecasters ${topicId} --node ${config.ALLORA_RPC_URL}`;
+      const command = `allorad query emissions active-forecasters ${topicId}`;
       const [stdout, error] = await this.execAsyncWithRetry(command);
 
       if (error) {
@@ -565,7 +578,7 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active reputers from Allora network');
 
-      const command = `allorad query emissions active-reputers ${topicId} --node ${config.ALLORA_RPC_URL}`;
+      const command = `allorad query emissions active-reputers ${topicId}`;
       const [stdout, error] = await this.execAsyncWithRetry(command);
 
       if (error) {
@@ -706,6 +719,172 @@ class AlloraConnectorService {
   }
 
   /**
+   * Get the current block height using CLI text/YAML output.
+   * Tries `--type=height` first, falls back to generic output parsing.
+   */
+  public async getCurrentBlockHeight(): Promise<number | null> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'getCurrentBlockHeight' });
+
+    const tryParse = (text: string | null): number | null => {
+      if (!text) return null;
+      // Prefer YAML header.height: "N"
+      const m = text.match(/\bheight:\s*"(\d+)"/);
+      if (m && m[1]) {
+        const n = Number(m[1]);
+        return Number.isFinite(n) ? n : null;
+      }
+      // Some nodes may print a simple number or other formats; attempt a generic digits grab
+      const m2 = text.match(/\b(\d{3,})\b/);
+      if (m2 && m2[1]) {
+        const n2 = Number(m2[1]);
+        if (Number.isFinite(n2)) return n2;
+      }
+      return null;
+    };
+
+    // 1) Preferred: `--type=height`
+    const cmdHeight = `allorad query block --type=height`;
+    const [out1] = await this.execAsyncWithRetry(cmdHeight);
+    let parsed = tryParse(out1);
+
+    // 2) Fallback: generic `block` parsing
+    if (parsed == null) {
+      const cmdFallback = `allorad query block`;
+      const [out2] = await this.execAsyncWithRetry(cmdFallback);
+      parsed = tryParse(out2);
+    }
+
+    if (parsed == null) {
+      log.error({ out1 }, 'Failed to parse current block height from CLI output');
+      return null;
+    }
+
+    log.info({ height: parsed }, 'Current block height');
+    return parsed;
+  }
+
+  /**
+   * Get topic timing information (epoch_length, worker_submission_window, epoch_last_ended)
+   * Command: `allorad query emissions topic <topicId>` (YAML/text)
+   */
+  public async getTopicInfo(topicId: string): Promise<{ epochLength: number; workerSubmissionWindow: number; epochLastEnded: number } | null> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'getTopicInfo', topicId });
+    const command = `allorad query emissions topic ${topicId}`;
+    const [stdout, error] = await this.execAsyncWithRetry(command);
+    if (error || !stdout) {
+      log.error({ err: error }, 'Failed to get topic info');
+      return null;
+    }
+    try {
+      const data = yaml.load(stdout) as any;
+      const t = data?.topic ?? {};
+      const epochLength = Number(t.epoch_length);
+      const workerWindow = Number(t.worker_submission_window);
+      const epochLastEnded = Number(t.epoch_last_ended);
+      if (![epochLength, workerWindow, epochLastEnded].every(Number.isFinite)) {
+        throw new Error('Missing or invalid numeric fields in topic');
+      }
+      log.info({ epochLength, workerWindow, epochLastEnded }, 'Parsed topic info');
+      return { epochLength, workerSubmissionWindow: workerWindow, epochLastEnded };
+    } catch (e) {
+      log.error({ err: e, stdout }, 'Failed to parse topic YAML');
+      return null;
+    }
+  }
+
+  /**
+   * Check if a worker nonce for a topic/block is unfulfilled (awaiting a worker response)
+   */
+  public async isWorkerNonceUnfulfilled(topicId: string, blockHeight: number): Promise<boolean> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'isWorkerNonceUnfulfilled', topicId, blockHeight });
+    const command = `allorad query emissions worker-nonce-unfulfilled ${topicId} ${blockHeight}`;
+    const [stdout, error] = await this.execAsyncWithRetry(command);
+    if (error || !stdout) {
+      log.error({ err: error }, 'Failed to query worker-nonce-unfulfilled');
+      return false;
+    }
+    try {
+      const data: any = yaml.load(stdout);
+      const raw = (data?.is_worker_nonce_unfulfilled ?? data?.unfulfilled ?? data?.value ?? data?.result);
+      if (typeof raw === 'boolean') return raw;
+      if (typeof raw === 'string') return raw.toLowerCase() === 'true';
+      // Fallback: direct regex search for true/false
+      const m = String(stdout).match(/\b(true|false)\b/i);
+      if (m) return m[1].toLowerCase() === 'true';
+      return false;
+    } catch (e) {
+      // YAML may not parse; try regex directly
+      const m = String(stdout).match(/\bis_worker_nonce_unfulfilled:\s*(true|false)\b/i) || String(stdout).match(/\b(true|false)\b/i);
+      if (m) return m[1].toLowerCase() === 'true';
+      log.error({ err: e, stdout }, 'Failed to parse worker-nonce-unfulfilled output');
+      return false;
+    }
+  }
+
+  /**
+   * Check whether a worker address can submit on a topic (whitelist/window check)
+   */
+  public async canSubmitWorker(topicId: string, workerAddress: string): Promise<boolean> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'canSubmitWorker', topicId, workerAddress });
+    const command = `allorad query emissions can-submit-worker-payload ${topicId} ${workerAddress}`;
+    const [stdout, error] = await this.execAsyncWithRetry(command);
+    if (error || !stdout) {
+      log.warn({ err: error }, 'can-submit-worker-payload failed; defaulting to true');
+      return true; // graceful fallback
+    }
+    try {
+      const data: any = yaml.load(stdout);
+      const raw = (data?.can_submit_worker_payload ?? data?.can_submit ?? data?.value ?? data?.result);
+      if (typeof raw === 'boolean') return raw;
+      if (typeof raw === 'string') return raw.toLowerCase() === 'true';
+      const m = String(stdout).match(/\b(true|false)\b/i);
+      if (m) return m[1].toLowerCase() === 'true';
+      return true;
+    } catch (e) {
+      const m = String(stdout).match(/\bcan_submit_worker_payload:\s*(true|false)\b/i) || String(stdout).match(/\b(true|false)\b/i);
+      if (m) return m[1].toLowerCase() === 'true';
+      log.warn({ err: e, stdout }, 'Failed to parse can-submit-worker-payload; defaulting to true');
+      return true;
+    }
+  }
+
+  /**
+   * Derive the latest open worker nonce by scanning within the current submission window
+   */
+  public async deriveLatestOpenWorkerNonce(topicId: string): Promise<number | null> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'deriveLatestOpenWorkerNonce', topicId });
+    const info = await this.getTopicInfo(topicId);
+    const current = await this.getCurrentBlockHeight();
+    if (!info || current == null) {
+      log.error({ info, current }, 'Missing topic info or current height');
+      return null;
+    }
+
+    const windowStart = info.epochLastEnded + 1;
+    const windowEnd = info.epochLastEnded + info.workerSubmissionWindow;
+
+    if (current < windowStart || current > windowEnd) {
+      log.info({ current, windowStart, windowEnd }, 'Outside worker submission window');
+      return null;
+    }
+
+    const SCAN_LIMIT = Math.max(1, Math.min(200, info.workerSubmissionWindow));
+    const start = Math.min(current, windowEnd);
+    const scanStart = Math.max(windowStart, start - SCAN_LIMIT + 1);
+
+    for (let h = start; h >= scanStart; h--) {
+      const unfilled = await this.isWorkerNonceUnfulfilled(topicId, h);
+      if (unfilled) {
+        log.info({ chosenBlockHeight: h }, 'Found unfulfilled worker nonce in window');
+        return h;
+      }
+    }
+
+    log.info({ start, scanStart, windowStart, windowEnd }, 'No unfulfilled nonce found in scan range');
+    return null;
+  }
+
+  /**
    * Get all active topics from the Allora network that are available for contribution at the current block height
    */
   public async getActiveTopics(): Promise<{ topics: Array<{ id: string; metadata: string }> }> {
@@ -714,27 +893,13 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active topics from Allora network');
 
-      // Get the current block height
-      const blockCommand = `allorad query block --node ${config.ALLORA_RPC_URL}`;
-      const [blockStdout, blockError] = await this.execAsyncWithRetry(blockCommand);
-
-      if (blockError) {
-        log.error({ err: blockError }, 'Failed to get current block height.');
+      const currentBlockHeight = await this.getCurrentBlockHeight();
+      if (currentBlockHeight == null) {
         return { topics: [] };
       }
-
-      // Parse the current block height
-      const blockMatch = blockStdout!.match(/height: "(\d+)"/);
-      if (!blockMatch) {
-        log.error('Failed to parse block height from output:', blockStdout);
-        return { topics: [] };
-      }
-
-      const currentBlockHeight = parseInt(blockMatch[1]);
-      log.info({ currentBlockHeight }, 'Found current block height');
 
       // Get active topics at the current block height (only topics available for contribution)
-      const activeTopicsCommand = `allorad query emissions active-topics-at-block ${currentBlockHeight} --node ${config.ALLORA_RPC_URL}`;
+      const activeTopicsCommand = `allorad query emissions active-topics-at-block ${currentBlockHeight}`;
       const [activeTopicsStdout, activeTopicsError] = await this.execAsyncWithRetry(activeTopicsCommand);
 
       if (activeTopicsError) {
