@@ -141,7 +141,8 @@ const inferenceProcessor = async (job: Job<InferenceJobData>): Promise<void> => 
       mnemonic,
       topicId,
       workerResponse,
-      gasPrice
+      gasPrice,
+      nonceHeight
     );
 
     if (!submissionResult) {

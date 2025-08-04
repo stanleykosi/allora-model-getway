@@ -133,14 +133,23 @@ export interface InputInferenceForecastBundle {
 }
 
 /**
+ * Nonce object used in worker data bundle.
+ */
+export interface Nonce {
+  block_height: string;
+}
+
+/**
  * @interface InputWorkerDataBundle
  * @description The final, top-level wrapper that includes the signed bundle and signature.
  * This is the direct payload for the `MsgInsertWorkerPayload`.
  */
 export interface InputWorkerDataBundle {
   worker: string;
+  nonce: Nonce; // required by proto
+  topic_id: string; // required by proto
   inference_forecasts_bundle: InputInferenceForecastBundle;
-  inference_forecasts_bundle_signature: string; // Hex-encoded signature
+  inferences_forecasts_bundle_signature: string; // Hex-encoded signature (proto name)
   pubkey: string; // Hex-encoded public key
 }
 

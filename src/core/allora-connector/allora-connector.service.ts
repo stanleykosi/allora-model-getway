@@ -605,7 +605,8 @@ class AlloraConnectorService {
     signingMnemonic: string,
     topicId: string,
     workerResponse: WorkerResponsePayload,
-    gasPrice: string
+    gasPrice: string,
+    nonceHeight?: number
   ): Promise<{ txHash: string } | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'submitWorkerPayload', topicId });
     let delay = this.INITIAL_DELAY_MS;
@@ -624,11 +625,12 @@ class AlloraConnectorService {
 
         const latestBlock = await client.getBlock();
         const currentBlockHeight = latestBlock.header.height.toString();
+        const blockHeightStr = String(nonceHeight ?? currentBlockHeight);
 
         // Construct the inference payload
         const inference: InputInference = {
           topic_id: topicId,
-          block_height: currentBlockHeight,
+          block_height: blockHeightStr,
           inferer: senderAddress,
           value: workerResponse.inferenceValue,
         };
@@ -643,7 +645,7 @@ class AlloraConnectorService {
 
           forecast = {
             topic_id: topicId,
-            block_height: currentBlockHeight,
+            block_height: blockHeightStr,
             forecaster: senderAddress,
             forecast_elements: forecastElements,
           };
@@ -680,8 +682,10 @@ class AlloraConnectorService {
         // Create the final worker data bundle
         const workerDataBundle: InputWorkerDataBundle = {
           worker: senderAddress,
+          nonce: { block_height: blockHeightStr },
+          topic_id: String(topicId),
           inference_forecasts_bundle: bundle,
-          inference_forecasts_bundle_signature: Buffer.from(fixedSignature).toString('hex'),
+          inferences_forecasts_bundle_signature: Buffer.from(fixedSignature).toString('hex'),
           pubkey: Buffer.from(pubKey).toString('hex'),
         };
 
