@@ -9,7 +9,7 @@
 /**
  * @interface AlloraTopic
  * @description Models the structure of the JSON output from the
- * `allorad query emissions get-topic [topic_id]` command.
+ * `allorad query emissions topic [topic_id]` command (v9).
  */
 export interface AlloraTopic {
   topic_id: string;
@@ -69,7 +69,7 @@ export interface TopicDetails {
 /**
  * @interface AlloraEmaScore
  * @description Models the structure of the JSON output from the
- * `allorad query emissions get-worker-ema-score` command.
+ * `allorad query emissions inferer-score-ema` command (v9).
  */
 export interface AlloraEmaScore {
   score: string;
@@ -102,6 +102,10 @@ export interface WorkerResponsePayload {
     workerAddress: string;
     forecastedValue: string;
   }>;
+  // Optional protocol data that can be passed through to the chain
+  extraData?: Uint8Array; // Additional data for inference
+  proof?: string; // Cryptographic proof for inference
+  forecastExtraData?: Uint8Array; // Additional data for forecast
 }
 
 export interface InputForecastElement {
@@ -110,17 +114,20 @@ export interface InputForecastElement {
 }
 
 export interface InputForecast {
-  topic_id: string;
-  block_height: string;
+  topic_id: number; // uint64 as per protocol
+  block_height: number; // int64 as per protocol
   forecaster: string; // Our worker's address
   forecast_elements: InputForecastElement[];
+  extra_data: Uint8Array; // Extra data as per protocol (empty array if not provided)
 }
 
 export interface InputInference {
-  topic_id: string;
-  block_height: string;
+  topic_id: number; // uint64 as per protocol
+  block_height: number; // int64 as per protocol
   inferer: string; // Our worker's address
   value: string;
+  extra_data: Uint8Array; // Extra data as per protocol (empty array if not provided)
+  proof: string; // Proof as per protocol (empty string if not provided)
 }
 
 /**
@@ -147,7 +154,7 @@ export interface Nonce {
 export interface InputWorkerDataBundle {
   worker: string;
   nonce: Nonce; // required by proto
-  topic_id: string; // required by proto
+  topic_id: number; // uint64 as per protocol
   inference_forecasts_bundle: InputInferenceForecastBundle;
   inferences_forecasts_bundle_signature: string; // Hex-encoded signature (proto name)
   pubkey: string; // Hex-encoded public key

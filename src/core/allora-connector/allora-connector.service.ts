@@ -53,8 +53,9 @@ import {
 const execAsync = promisify(exec);
 
 // Define the type URLs for our custom messages. These must match the definitions on the Allora chain.
+// Note: Using v9 for worker payloads, v1 for legacy inference submissions
 const msgInsertInferenceTypeUrl = "/emissions.v1.MsgInsertInferences";
-const msgInsertWorkerPayloadTypeUrl = "/emissions.v1.MsgInsertWorkerPayload";
+const msgInsertWorkerPayloadTypeUrl = "/emissions.v9.MsgInsertWorkerPayload";
 
 class AlloraConnectorService {
   private readonly MAX_RETRIES = 3;
@@ -230,13 +231,13 @@ class AlloraConnectorService {
         const raw = activeYaml?.is_topic_active ?? activeYaml?.active ?? activeYaml?.value ?? activeYaml?.result;
         if (typeof raw === 'boolean') isActive = raw;
         else if (typeof raw === 'string') isActive = raw.toLowerCase() === 'true';
-      } catch {}
+      } catch { }
       // Fallback: JSON parse if applicable
       if (!isActive) {
         try {
           const isActiveData = JSON.parse(activeStdout!);
           isActive = typeof isActiveData === 'boolean' ? isActiveData : Boolean(isActiveData.is_active ?? isActiveData.value);
-        } catch {}
+        } catch { }
       }
 
       // Parse the topic response using proper YAML parser
@@ -601,6 +602,64 @@ class AlloraConnectorService {
   /**
  * Submit a worker payload (inference and forecasts) to the Allora blockchain using V2 format
  */
+  /**
+   * Validates that the worker data bundle matches the protocol requirements
+   */
+  private validateWorkerDataBundle(bundle: InputWorkerDataBundle): void {
+    if (!bundle.worker || !bundle.topic_id || !bundle.nonce) {
+      throw new Error('Missing required fields in worker data bundle');
+    }
+
+    if (!bundle.inference_forecasts_bundle) {
+      throw new Error('Missing inference_forecasts_bundle');
+    }
+
+    if (!bundle.inferences_forecasts_bundle_signature || !bundle.pubkey) {
+      throw new Error('Missing signature or public key');
+    }
+
+    // Validate nonce structure
+    if (!bundle.nonce.block_height) {
+      throw new Error('Missing block_height in nonce');
+    }
+
+    // Validate bundle contents
+    const { inference, forecast } = bundle.inference_forecasts_bundle;
+    if (!inference && !forecast) {
+      throw new Error('At least one of inference or forecast must be provided');
+    }
+
+    if (inference) {
+      if (typeof inference.topic_id !== 'number' || typeof inference.block_height !== 'number' || !inference.inferer || !inference.value) {
+        throw new Error('Missing required fields in inference');
+      }
+      // Validate protocol fields are present (even if empty)
+      if (!Array.isArray(inference.extra_data) || typeof inference.proof !== 'string') {
+        throw new Error('Invalid protocol fields in inference');
+      }
+    }
+
+    if (forecast) {
+      if (typeof forecast.topic_id !== 'number' || typeof forecast.block_height !== 'number' || !forecast.forecaster || !forecast.forecast_elements) {
+        throw new Error('Missing required fields in forecast');
+      }
+      // Validate protocol fields are present (even if empty)
+      if (!Array.isArray(forecast.extra_data)) {
+        throw new Error('Invalid protocol fields in forecast');
+      }
+
+      if (forecast.forecast_elements.length === 0) {
+        throw new Error('Forecast must have at least one forecast element');
+      }
+
+      for (const element of forecast.forecast_elements) {
+        if (!element.inferer || !element.value) {
+          throw new Error('Invalid forecast element structure');
+        }
+      }
+    }
+  }
+
   public async submitWorkerPayload(
     signingMnemonic: string,
     topicId: string,
@@ -627,13 +686,19 @@ class AlloraConnectorService {
         const currentBlockHeight = latestBlock.header.height.toString();
         const blockHeightStr = String(nonceHeight ?? currentBlockHeight);
 
-        // Construct the inference payload
-        const inference: InputInference = {
-          topic_id: topicId,
-          block_height: blockHeightStr,
-          inferer: senderAddress,
-          value: workerResponse.inferenceValue,
-        };
+        // Construct the inference payload if inferenceValue is provided
+        let inference: InputInference | null = null;
+        if (workerResponse.inferenceValue) {
+          inference = {
+            topic_id: Number(topicId), // Convert to uint64 as per protocol
+            block_height: Number(blockHeightStr), // Convert to int64 as per protocol
+            inferer: senderAddress,
+            value: workerResponse.inferenceValue,
+            // Optional protocol fields - set explicit defaults for protobuf compatibility
+            extra_data: workerResponse.extraData || new Uint8Array(0), // Empty Uint8Array if not provided
+            proof: workerResponse.proof || "", // Empty string if not provided
+          };
+        }
 
         // Construct the forecast payload if forecasts are provided
         let forecast: InputForecast | null = null;
@@ -644,10 +709,12 @@ class AlloraConnectorService {
           }));
 
           forecast = {
-            topic_id: topicId,
-            block_height: blockHeightStr,
+            topic_id: Number(topicId), // Convert to uint64 as per protocol
+            block_height: Number(blockHeightStr), // Convert to int64 as per protocol
             forecaster: senderAddress,
             forecast_elements: forecastElements,
+            // Optional protocol field - set explicit default for protobuf compatibility
+            extra_data: workerResponse.forecastExtraData || new Uint8Array(0), // Empty Uint8Array if not provided
           };
         }
 
@@ -683,11 +750,14 @@ class AlloraConnectorService {
         const workerDataBundle: InputWorkerDataBundle = {
           worker: senderAddress,
           nonce: { block_height: blockHeightStr },
-          topic_id: String(topicId),
+          topic_id: Number(topicId), // Convert to uint64 as per protocol
           inference_forecasts_bundle: bundle,
           inferences_forecasts_bundle_signature: Buffer.from(fixedSignature).toString('hex'),
           pubkey: Buffer.from(pubKey).toString('hex'),
         };
+
+        // Validate the bundle before submission
+        this.validateWorkerDataBundle(workerDataBundle);
 
         // Create the message for blockchain submission
         const message: EncodeObject = {

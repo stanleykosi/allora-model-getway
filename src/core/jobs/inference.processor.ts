@@ -37,8 +37,6 @@ interface ModelAndWallet {
 }
 
 /**
- * Fetches the prediction from the data scientist's model webhook.
- * It now provides active worker addresses to the webhook for forecasting.
  * @param webhookUrl The URL to call.
  * @param activeWorkers Addresses of other workers on the topic.
  * @returns A promise resolving to the new WorkerResponsePayload.
@@ -53,12 +51,44 @@ const getInferenceFromWebhook = async (webhookUrl: string, activeWorkers: string
       { timeout: 10000 } // 10-second timeout
     );
 
-    if (response.status !== 200 || !response.data.inferenceValue) {
-      throw new Error(`Webhook returned status ${response.status} or is missing 'inferenceValue'.`);
+    if (response.status !== 200) {
+      throw new Error(`Webhook returned status ${response.status}`);
     }
 
-    log.info({ hasForecasts: !!response.data.forecasts }, 'Successfully received payload from webhook.');
-    return response.data;
+    // Check if we have any data to submit
+    const data = response.data;
+    if (!data.inferenceValue && (!data.forecasts || data.forecasts.length === 0)) {
+      throw new Error('Webhook must provide either inferenceValue or forecasts');
+    }
+
+    // Validate optional protocol fields if provided
+    if (data.extraData && typeof data.extraData !== 'string') {
+      throw new Error('extraData must be a base64-encoded string');
+    }
+    if (data.proof && typeof data.proof !== 'string') {
+      throw new Error('proof must be a string');
+    }
+    if (data.forecastExtraData && typeof data.forecastExtraData !== 'string') {
+      throw new Error('forecastExtraData must be a base64-encoded string');
+    }
+
+    // Convert base64 strings to Uint8Array for protocol compliance
+    const processedData: WorkerResponsePayload = {
+      inferenceValue: data.inferenceValue,
+      forecasts: data.forecasts,
+      extraData: data.extraData ? Buffer.from(data.extraData, 'base64') : undefined,
+      proof: data.proof,
+      forecastExtraData: data.forecastExtraData ? Buffer.from(data.forecastExtraData, 'base64') : undefined,
+    };
+
+    log.info({
+      hasForecasts: !!data.forecasts,
+      hasExtraData: !!data.extraData,
+      hasProof: !!data.proof,
+      hasForecastExtraData: !!data.forecastExtraData
+    }, 'Successfully received payload from webhook.');
+
+    return processedData;
   } catch (error) {
     log.error({ err: error }, 'Failed to get inference from model webhook.');
     throw error;
