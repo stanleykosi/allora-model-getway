@@ -21,6 +21,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import axios from 'axios';
 import {
   SigningStargateClient,
   GasPrice,
@@ -42,13 +43,17 @@ import {
   ExecResult,
   AlloraWorkerPerformance,
   AlloraEmaScore,
+  WorkerResponsePayload
+} from './allora-connector.types';
+import {
   InputInference,
   InputForecast,
   InputInferenceForecastBundle,
   InputForecastElement,
-  WorkerResponsePayload,
-  InputWorkerDataBundle
-} from './allora-connector.types';
+  InputWorkerDataBundle,
+  Nonce,
+  InsertWorkerPayloadRequest
+} from '@/generated/allora_worker';
 
 const execAsync = promisify(exec);
 
@@ -87,8 +92,8 @@ class AlloraConnectorService {
         const encoded = {
           sender: message.sender,
           inferences: message.inferences.map((inf: any) => ({
-            topic_id: inf.topic_id,
-            block_height: inf.block_height,
+            topicId: inf.topicId,
+            blockHeight: inf.blockHeight,
             value: inf.value
           }))
         };
@@ -102,18 +107,7 @@ class AlloraConnectorService {
       fromPartial: (object: any) => object,
     });
 
-    registry.register(msgInsertWorkerPayloadTypeUrl, {
-      encode: (message: any, writer: any) => {
-        // This is a simplified mock of protobuf encoding for worker payloads.
-        writer.writeString(JSON.stringify(message));
-        return writer;
-      },
-      decode: (reader: any, length: any) => {
-        const json = reader.readString(length);
-        return JSON.parse(json);
-      },
-      fromPartial: (object: any) => object,
-    });
+
     this.registry = registry;
     logger.info('AlloraConnectorService initialized with custom message types.');
   }
@@ -445,8 +439,8 @@ class AlloraConnectorService {
         const msg = {
           sender: senderAddress,
           inferences: [{
-            topic_id: topicId,
-            block_height: latestBlock.header.height.toString(),
+            topicId: topicId,
+            blockHeight: latestBlock.header.height.toString(),
             value: inferenceData.value,
           }],
         };
@@ -606,53 +600,53 @@ class AlloraConnectorService {
    * Validates that the worker data bundle matches the protocol requirements
    */
   private validateWorkerDataBundle(bundle: InputWorkerDataBundle): void {
-    if (!bundle.worker || !bundle.topic_id || !bundle.nonce) {
+    if (!bundle.worker || !bundle.topicId || !bundle.nonce) {
       throw new Error('Missing required fields in worker data bundle');
     }
 
-    if (!bundle.inference_forecasts_bundle) {
-      throw new Error('Missing inference_forecasts_bundle');
+    if (!bundle.inferenceForecastsBundle) {
+      throw new Error('Missing inferenceForecastsBundle');
     }
 
-    if (!bundle.inferences_forecasts_bundle_signature || !bundle.pubkey) {
+    if (!bundle.inferencesForecastsBundleSignature || !bundle.pubkey) {
       throw new Error('Missing signature or public key');
     }
 
     // Validate nonce structure
-    if (!bundle.nonce.block_height) {
-      throw new Error('Missing block_height in nonce');
+    if (!bundle.nonce.blockHeight) {
+      throw new Error('Missing blockHeight in nonce');
     }
 
     // Validate bundle contents
-    const { inference, forecast } = bundle.inference_forecasts_bundle;
+    const { inference, forecast } = bundle.inferenceForecastsBundle;
     if (!inference && !forecast) {
       throw new Error('At least one of inference or forecast must be provided');
     }
 
     if (inference) {
-      if (typeof inference.topic_id !== 'number' || typeof inference.block_height !== 'number' || !inference.inferer || !inference.value) {
+      if (typeof inference.topicId !== 'number' || typeof inference.blockHeight !== 'number' || !inference.inferer || !inference.value) {
         throw new Error('Missing required fields in inference');
       }
       // Validate protocol fields are present (even if empty)
-      if (!Array.isArray(inference.extra_data) || typeof inference.proof !== 'string') {
+      if (!(inference.extraData instanceof Uint8Array) || typeof inference.proof !== 'string') {
         throw new Error('Invalid protocol fields in inference');
       }
     }
 
     if (forecast) {
-      if (typeof forecast.topic_id !== 'number' || typeof forecast.block_height !== 'number' || !forecast.forecaster || !forecast.forecast_elements) {
+      if (typeof forecast.topicId !== 'number' || typeof forecast.blockHeight !== 'number' || !forecast.forecaster || !forecast.forecastElements) {
         throw new Error('Missing required fields in forecast');
       }
       // Validate protocol fields are present (even if empty)
-      if (!Array.isArray(forecast.extra_data)) {
+      if (!(forecast.extraData instanceof Uint8Array)) {
         throw new Error('Invalid protocol fields in forecast');
       }
 
-      if (forecast.forecast_elements.length === 0) {
+      if (forecast.forecastElements.length === 0) {
         throw new Error('Forecast must have at least one forecast element');
       }
 
-      for (const element of forecast.forecast_elements) {
+      for (const element of forecast.forecastElements) {
         if (!element.inferer || !element.value) {
           throw new Error('Invalid forecast element structure');
         }
@@ -670,13 +664,14 @@ class AlloraConnectorService {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'submitWorkerPayload', topicId });
     let delay = this.INITIAL_DELAY_MS;
 
+    let senderAddress: string = 'unknown';
     for (let i = 0; i < this.MAX_RETRIES; i++) {
       try {
         log.info({ attempt: i + 1, topicId }, 'Attempting to submit worker payload.');
 
         const wallet = await DirectSecp256k1HdWallet.fromMnemonic(signingMnemonic, { prefix: 'allo' });
         const [account] = await wallet.getAccounts();
-        const senderAddress = account.address;
+        senderAddress = account.address;
 
         const client = await SigningStargateClient.connectWithSigner(config.ALLORA_RPC_URL, wallet, {
           gasPrice: GasPrice.fromString(gasPrice),
@@ -687,21 +682,21 @@ class AlloraConnectorService {
         const blockHeightStr = String(nonceHeight ?? currentBlockHeight);
 
         // Construct the inference payload if inferenceValue is provided
-        let inference: InputInference | null = null;
+        let inference: InputInference | undefined = undefined;
         if (workerResponse.inferenceValue) {
           inference = {
-            topic_id: Number(topicId), // Convert to uint64 as per protocol
-            block_height: Number(blockHeightStr), // Convert to int64 as per protocol
+            topicId: Number(topicId), // Convert to uint64 as per protocol
+            blockHeight: Number(blockHeightStr), // Convert to int64 as per protocol
             inferer: senderAddress,
             value: workerResponse.inferenceValue,
             // Optional protocol fields - set explicit defaults for protobuf compatibility
-            extra_data: workerResponse.extraData || new Uint8Array(0), // Empty Uint8Array if not provided
+            extraData: workerResponse.extraData || new Uint8Array(0), // Empty Uint8Array if not provided
             proof: workerResponse.proof || "", // Empty string if not provided
           };
         }
 
         // Construct the forecast payload if forecasts are provided
-        let forecast: InputForecast | null = null;
+        let forecast: InputForecast | undefined = undefined;
         if (workerResponse.forecasts && workerResponse.forecasts.length > 0) {
           const forecastElements: InputForecastElement[] = workerResponse.forecasts.map(f => ({
             inferer: f.workerAddress,
@@ -709,12 +704,12 @@ class AlloraConnectorService {
           }));
 
           forecast = {
-            topic_id: Number(topicId), // Convert to uint64 as per protocol
-            block_height: Number(blockHeightStr), // Convert to int64 as per protocol
+            topicId: Number(topicId), // Convert to uint64 as per protocol
+            blockHeight: Number(blockHeightStr), // Convert to int64 as per protocol
             forecaster: senderAddress,
-            forecast_elements: forecastElements,
+            forecastElements: forecastElements,
             // Optional protocol field - set explicit default for protobuf compatibility
-            extra_data: workerResponse.forecastExtraData || new Uint8Array(0), // Empty Uint8Array if not provided
+            extraData: workerResponse.forecastExtraData || new Uint8Array(0), // Empty Uint8Array if not provided
           };
         }
 
@@ -724,9 +719,13 @@ class AlloraConnectorService {
           forecast: forecast,
         };
 
-        // Sign the bundle
-        const serializedBundle = stableStringify(bundle);
-        const messageBytes = new TextEncoder().encode(serializedBundle);
+        // Create an instance of the generated class for the bundle
+        const bundleProto = InputInferenceForecastBundle.fromPartial(bundle);
+
+        // Use the generated .encode() method to get the binary data
+        const messageBytes = InputInferenceForecastBundle.encode(bundleProto).finish();
+
+        // Hash and sign the binary data
         const messageHash = sha256(messageBytes);
 
         // Derive private key from mnemonic
@@ -749,20 +748,26 @@ class AlloraConnectorService {
         // Create the final worker data bundle
         const workerDataBundle: InputWorkerDataBundle = {
           worker: senderAddress,
-          nonce: { block_height: blockHeightStr },
-          topic_id: Number(topicId), // Convert to uint64 as per protocol
-          inference_forecasts_bundle: bundle,
-          inferences_forecasts_bundle_signature: Buffer.from(fixedSignature).toString('hex'),
+          nonce: { blockHeight: Number(blockHeightStr) },
+          topicId: Number(topicId), // Convert to uint64 as per protocol
+          inferenceForecastsBundle: bundle,
+          inferencesForecastsBundleSignature: Buffer.from(fixedSignature),
           pubkey: Buffer.from(pubKey).toString('hex'),
         };
 
         // Validate the bundle before submission
         this.validateWorkerDataBundle(workerDataBundle);
 
-        // Create the message for blockchain submission
+        // Create an instance of the generated worker data bundle class
+        const workerDataBundleProto = InputWorkerDataBundle.fromPartial(workerDataBundle);
+
+        // Create the final message for blockchain submission using the generated Msg class
         const message: EncodeObject = {
           typeUrl: msgInsertWorkerPayloadTypeUrl,
-          value: workerDataBundle,
+          value: InsertWorkerPayloadRequest.fromPartial({
+            sender: senderAddress,
+            workerDataBundle: workerDataBundleProto,
+          }),
         };
 
         const fee = {
@@ -774,14 +779,25 @@ class AlloraConnectorService {
         const result = await client.signAndBroadcast(senderAddress, [message], fee, `Submitting worker payload for topic ${topicId}`);
 
         if (isDeliverTxFailure(result)) {
-          throw new Error(`Worker payload transaction failed: ${result.rawLog}`);
+          // Log the specific reason the chain rejected the transaction, including the hash
+          log.error(
+            { rawLog: result.rawLog, txHash: result.transactionHash, code: result.code },
+            'Transaction was broadcast but failed on-chain execution.'
+          );
+          throw new Error(`Transaction failed: ${result.rawLog}`);
         }
 
         log.info({ txHash: result.transactionHash, topicId }, 'Worker payload submission successful.');
         return { txHash: result.transactionHash };
 
       } catch (error) {
-        log.error({ err: error, attempt: i + 1 }, `Attempt ${i + 1} to submit worker payload failed.`);
+        log.error({
+          err: error,
+          attempt: i + 1,
+          // Add any extra context available at this point
+          signingAddress: senderAddress || 'unknown'
+        }, `Attempt ${i + 1} to submit worker payload failed.`
+        );
         if (i === this.MAX_RETRIES - 1) {
           return null;
         }
@@ -927,35 +943,41 @@ class AlloraConnectorService {
    */
   public async deriveLatestOpenWorkerNonce(topicId: string): Promise<number | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'deriveLatestOpenWorkerNonce', topicId });
-    const info = await this.getTopicInfo(topicId);
-    const current = await this.getCurrentBlockHeight();
-    if (!info || current == null) {
-      log.error({ info, current }, 'Missing topic info or current height');
-      return null;
-    }
+    const apiUrl = `https://allora-api.testnet.allora.network/emissions/v9/unfulfilled_worker_nonces/${topicId}`;
 
-    const windowStart = info.epochLastEnded + 1;
-    const windowEnd = info.epochLastEnded + info.workerSubmissionWindow;
+    try {
+      log.info({ url: apiUrl }, 'Querying for unfulfilled worker nonces.');
+      const response = await axios.get(apiUrl);
 
-    if (current < windowStart || current > windowEnd) {
-      log.info({ current, windowStart, windowEnd }, 'Outside worker submission window');
-      return null;
-    }
+      // The response structure is nested, so we access it safely.
+      const nonces = response.data?.nonces?.nonces;
 
-    const SCAN_LIMIT = Math.max(1, Math.min(200, info.workerSubmissionWindow));
-    const start = Math.min(current, windowEnd);
-    const scanStart = Math.max(windowStart, start - SCAN_LIMIT + 1);
-
-    for (let h = start; h >= scanStart; h--) {
-      const unfilled = await this.isWorkerNonceUnfulfilled(topicId, h);
-      if (unfilled) {
-        log.info({ chosenBlockHeight: h }, 'Found unfulfilled worker nonce in window');
-        return h;
+      if (!nonces || !Array.isArray(nonces) || nonces.length === 0) {
+        log.info({ topicId }, 'No unfulfilled worker nonces found for topic.');
+        return null;
       }
-    }
 
-    log.info({ start, scanStart, windowStart, windowEnd }, 'No unfulfilled nonce found in scan range');
-    return null;
+      // Take the first available nonce from the list.
+      const openNonce = nonces[0];
+      const blockHeight = parseInt(openNonce.block_height, 10);
+
+      if (isNaN(blockHeight)) {
+        log.warn({ nonce: openNonce }, 'Found nonce but failed to parse block_height.');
+        return null;
+      }
+
+      log.info({ chosenBlockHeight: blockHeight }, 'Found open worker nonce via direct API call.');
+      return blockHeight;
+
+    } catch (error: any) {
+      // Check for a 404 error, which simply means no nonces exist.
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        log.info({ topicId }, 'Received 404, confirming no unfulfilled nonces.');
+        return null;
+      }
+      log.error({ err: error, topicId }, 'Failed to fetch unfulfilled worker nonces.');
+      return null;
+    }
   }
 
   /**

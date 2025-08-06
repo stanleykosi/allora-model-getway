@@ -87,13 +87,12 @@ export interface AlloraWorkerPerformance {
 }
 
 // =================================================================
-// START: NEW OFFICIAL PAYLOAD STRUCTURES (ALIGNMENT V2)
-// These types mirror the official Go structs for worker submissions.
+// WORKER RESPONSE PAYLOAD - Used by webhook interface
 // =================================================================
 
 /**
  * @interface WorkerResponsePayload
- * @description Defines the new expected payload from a data scientist's model webhook.
+ * @description Defines the expected payload from a data scientist's model webhook.
  * A model can now return both an inference and forecasts.
  */
 export interface WorkerResponsePayload {
@@ -106,57 +105,5 @@ export interface WorkerResponsePayload {
   extraData?: Uint8Array; // Additional data for inference
   proof?: string; // Cryptographic proof for inference
   forecastExtraData?: Uint8Array; // Additional data for forecast
-}
-
-export interface InputForecastElement {
-  inferer: string; // Address of the worker being forecasted
-  value: string;   // The forecasted loss for that worker
-}
-
-export interface InputForecast {
-  topic_id: number; // uint64 as per protocol
-  block_height: number; // int64 as per protocol
-  forecaster: string; // Our worker's address
-  forecast_elements: InputForecastElement[];
-  extra_data: Uint8Array; // Extra data as per protocol (empty array if not provided)
-}
-
-export interface InputInference {
-  topic_id: number; // uint64 as per protocol
-  block_height: number; // int64 as per protocol
-  inferer: string; // Our worker's address
-  value: string;
-  extra_data: Uint8Array; // Extra data as per protocol (empty array if not provided)
-  proof: string; // Proof as per protocol (empty string if not provided)
-}
-
-/**
- * @interface InputInferenceForecastBundle
- * @description The core data structure that gets serialized and signed by the worker's key.
- */
-export interface InputInferenceForecastBundle {
-  inference: InputInference | null;
-  forecast: InputForecast | null;
-}
-
-/**
- * Nonce object used in worker data bundle.
- */
-export interface Nonce {
-  block_height: string;
-}
-
-/**
- * @interface InputWorkerDataBundle
- * @description The final, top-level wrapper that includes the signed bundle and signature.
- * This is the direct payload for the `MsgInsertWorkerPayload`.
- */
-export interface InputWorkerDataBundle {
-  worker: string;
-  nonce: Nonce; // required by proto
-  topic_id: number; // uint64 as per protocol
-  inference_forecasts_bundle: InputInferenceForecastBundle;
-  inferences_forecasts_bundle_signature: string; // Hex-encoded signature (proto name)
-  pubkey: string; // Hex-encoded public key
 }
 

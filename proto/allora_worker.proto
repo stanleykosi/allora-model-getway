@@ -1,0 +1,73 @@
+syntax = "proto3";
+package emissions.v9;
+
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/allora-network/allora-chain/x/emissions/types";
+
+message Nonce {
+  option (gogoproto.equal) = true;
+  int64 block_height = 1; // block height of the request
+}
+
+message InputInference {
+  option (gogoproto.equal) = true;
+
+  uint64 topic_id = 1;
+  int64 block_height = 2;
+  string inferer = 3;
+  string value = 4;
+  bytes extra_data = 5;
+  string proof = 6;
+}
+
+message InputInferences {
+  repeated InputInference inferences = 1;
+}
+
+message InputForecastElement {
+  option (gogoproto.equal) = true;
+
+  string inferer = 1;
+  string value = 2;
+}
+
+message InputForecast {
+  option (gogoproto.equal) = true;
+  uint64 topic_id = 1;
+  int64 block_height = 2;
+  string forecaster = 3;
+  repeated InputForecastElement forecast_elements = 4;
+  bytes extra_data = 5;
+}
+
+message InputForecasts {
+  repeated InputForecast forecasts = 1;
+}
+
+message InputInferenceForecastBundle {
+  option (gogoproto.equal) = true;
+  InputInference inference = 1;
+  InputForecast forecast = 2;
+}
+
+message InputWorkerDataBundle {
+  option (gogoproto.equal) = true;
+  string worker = 1;
+  Nonce nonce = 2;
+  uint64 topic_id = 3;
+  InputInferenceForecastBundle inference_forecasts_bundle = 4;
+  bytes inferences_forecasts_bundle_signature = 5;
+  string pubkey = 6;
+}
+
+message InputWorkerDataBundles {
+  repeated InputWorkerDataBundle worker_data_bundles = 1;
+}
+
+message InsertWorkerPayloadRequest {
+  string sender = 1;
+  InputWorkerDataBundle worker_data_bundle = 2;
+}
+
+message InsertWorkerPayloadResponse {} 

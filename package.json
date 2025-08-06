@@ -22,7 +22,8 @@
     "migrate:rls": "node scripts/apply-rls-policies.js",
     "test:rls": "node scripts/test-rls-policies.js",
     "verify:rls": "node scripts/verify-rls-deployment.js",
-    "setup:security": "npm run migrate:rls && npm run verify:rls"
+    "setup:security": "npm run migrate:rls && npm run verify:rls",
+    "proto:gen": "protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=./src/generated --ts_proto_opt=esModuleInterop=true --proto_path=./proto ./proto/allora_worker.proto"
   },
   "keywords": [
     "allora",
@@ -103,6 +104,7 @@
     "tailwindcss": "^3.4.6",
     "ts-jest": "^29.2.2",
     "ts-node": "^10.9.2",
+    "ts-proto": "^2.7.5",
     "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3",
