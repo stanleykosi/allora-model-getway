@@ -82,6 +82,11 @@ const envSchema = z.object({
 
   // Testing/Dev toggles
   DRY_RUN_TRANSACTIONS: z.coerce.boolean().default(false),
+
+  // Active topics discovery (fallback) configuration
+  ACTIVE_TOPICS_SCAN_START_ID: z.coerce.number().int().positive().default(1),
+  ACTIVE_TOPICS_SCAN_END_ID: z.coerce.number().int().positive().default(100),
+  ACTIVE_TOPICS_CACHE_MS: z.coerce.number().int().positive().default(60000),
 });
 
 /**

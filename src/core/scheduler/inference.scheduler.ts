@@ -26,6 +26,10 @@ const log = logger.child({ module: 'InferenceScheduler' });
 class InferenceScheduler {
   // A map to keep track of running cron jobs for each topic ID.
   private topicJobs: Map<string, cron.ScheduledTask> = new Map();
+  // Secondary window watchers to catch precise submission windows
+  private windowWatchers: Map<string, NodeJS.Timeout> = new Map();
+  // Track last window start height we triggered for, to avoid duplicate enqueues within the same window
+  private lastTriggeredWindowStart: Map<string, number> = new Map();
   private isRunning = false;
 
   /**
@@ -65,6 +69,12 @@ class InferenceScheduler {
           const job = this.topicJobs.get(topicId);
           job?.stop();
           this.topicJobs.delete(topicId);
+          const watcher = this.windowWatchers.get(topicId);
+          if (watcher) {
+            clearInterval(watcher);
+            this.windowWatchers.delete(topicId);
+          }
+          this.lastTriggeredWindowStart.delete(topicId);
         }
       }
 
@@ -116,6 +126,32 @@ class InferenceScheduler {
 
       // 4. Store the job in the map for tracking.
       this.topicJobs.set(topicId, task);
+
+      // 5. Start a secondary window watcher to trigger near window openings
+      // Polling interval: align roughly to average block time, capped between 5s and 30s
+      const watcherIntervalMs = Math.max(5, Math.min(config.AVERAGE_BLOCK_TIME_SECONDS, 30)) * 1000;
+      const watcher = setInterval(async () => {
+        try {
+          const currentHeight = await alloraConnectorService.getCurrentBlockHeight();
+          if (currentHeight == null) return;
+          const td = await alloraConnectorService.getTopicDetails(topicId);
+          if (!td || !td.isActive || td.epochLastEnded == null || td.workerSubmissionWindow == null) return;
+          const windowStart = td.epochLastEnded + 1;
+          const windowEnd = td.epochLastEnded + td.workerSubmissionWindow;
+
+          const inWindow = currentHeight >= windowStart && currentHeight <= windowEnd;
+          const last = this.lastTriggeredWindowStart.get(topicId);
+          if (inWindow && last !== windowStart) {
+            log.info({ topicId, currentHeight, windowStart, windowEnd }, 'Window watcher triggering enqueue for new window.');
+            this.lastTriggeredWindowStart.set(topicId, windowStart);
+            await this.enqueueInferenceJobs(topicId);
+          }
+        } catch (e) {
+          log.warn({ err: e, topicId }, 'Window watcher iteration failed');
+        }
+      }, watcherIntervalMs);
+
+      this.windowWatchers.set(topicId, watcher);
 
     } catch (error) {
       log.error({ err: error, topicId }, 'Failed to schedule job for topic.');

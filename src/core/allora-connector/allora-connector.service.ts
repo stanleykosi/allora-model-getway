@@ -212,7 +212,7 @@ class AlloraConnectorService {
 
         if (!topicData) throw new Error('Missing topic data in response');
 
-      return {
+        return {
           id: String(topicData.id ?? topicData.topic_id ?? topicId),
           epochLength: parseInt(String(topicData.epoch_length ?? '0'), 10),
           workerSubmissionWindow: topicData.worker_submission_window ? parseInt(String(topicData.worker_submission_window), 10) : undefined,
@@ -249,7 +249,7 @@ class AlloraConnectorService {
       }
     }
     logger.error({ address }, 'Failed to get account balance from all API nodes');
-      return null;
+    return null;
   }
 
   /**
@@ -309,6 +309,10 @@ class AlloraConnectorService {
   ): Promise<{ txHash: string } | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'transferFunds' });
     let delay = this.INITIAL_DELAY_MS;
+    // Start with a conservative multiplier; raise on out-of-gas
+    let safetyMultiplier = 1.35;
+    // If we parse gasUsed from an out-of-gas error, prefer this absolute override next attempt
+    let nextGasOverride: number | null = null;
 
     for (let i = 0; i < this.MAX_RETRIES; i++) {
       try {
@@ -329,6 +333,7 @@ class AlloraConnectorService {
 
         // Simulate to estimate gas
         let gasLimit = parseInt(this.UNIVERSAL_GAS_LIMIT, 10);
+        let simulatedGas: number | null = null;
         try {
           const simulated = await signingClient.simulate(
             fromAccount.address,
@@ -340,9 +345,19 @@ class AlloraConnectorService {
             ],
             undefined
           );
-          gasLimit = Math.ceil(Number(simulated) * 1.2);
+          simulatedGas = Number(simulated);
+          gasLimit = Math.ceil(simulatedGas * safetyMultiplier);
+          if (nextGasOverride && nextGasOverride > gasLimit) {
+            gasLimit = nextGasOverride;
+          }
+          log.debug({ simulatedGas, safetyMultiplier, chosenGasLimit: gasLimit }, 'Simulated gas and chosen gas limit for transfer');
         } catch (e) {
           log.warn({ err: e }, 'Simulation failed for transferFunds; using default gas limit');
+          // If we have a parsed override from a previous out-of-gas, use it
+          if (nextGasOverride) {
+            gasLimit = nextGasOverride;
+            log.warn({ nextGasOverride }, 'Applying parsed gas override after previous out-of-gas');
+          }
         }
 
         const fee = calculateFee(gasLimit, await this.getEffectiveGasPrice(this.TREASURY_GAS_PRICE));
@@ -364,6 +379,24 @@ class AlloraConnectorService {
 
       } catch (error) {
         log.warn({ err: error, attempt: i + 1 }, 'Transfer funds attempt failed');
+        // Heuristic: if out-of-gas, parse gasUsed and increase our safety for the next attempt
+        const message = String((error as any)?.message || '');
+        if (/out of gas/i.test(message)) {
+          const usedMatch = message.match(/gasUsed:\s*(\d+)/i);
+          if (usedMatch && usedMatch[1]) {
+            const parsedUsed = parseInt(usedMatch[1], 10);
+            if (!Number.isNaN(parsedUsed)) {
+              // Set next override to 1.4x gasUsed, and also raise multiplier for any new simulation
+              nextGasOverride = Math.ceil(parsedUsed * 1.4);
+              safetyMultiplier = Math.max(safetyMultiplier + 0.25, 1.5);
+              log.warn({ parsedUsed, nextGasOverride, safetyMultiplier }, 'Adjusting gas for next attempt due to out-of-gas');
+            }
+          } else {
+            // If we cannot parse, still bump multiplier
+            safetyMultiplier = Math.max(safetyMultiplier + 0.25, 1.5);
+            log.warn({ safetyMultiplier }, 'Bumping gas multiplier for next attempt due to out-of-gas');
+          }
+        }
         const decision = processChainError(error);
         if (decision.action === ChainErrorAction.Fail) return null;
         if (decision.action === ChainErrorAction.SwitchNode) this.switchToNextRpcNode();
@@ -761,8 +794,8 @@ class AlloraConnectorService {
       }
     }
     log.error('Failed to get current block height from all available API nodes.');
-      return null;
-    }
+    return null;
+  }
 
   // Topic timing information is available via getTopicDetails
   // isWorkerNonceUnfulfilled (CLI-based) removed in favor of API-based deriveLatestOpenWorkerNonce
@@ -777,10 +810,10 @@ class AlloraConnectorService {
         const apiUrl = this.getCurrentApiNode();
         const response = await this.apiClient.get(`${apiUrl}/emissions/v9/can_submit_worker_payload/${topicId}/${workerAddress}`);
         const raw = response.data?.can_submit_worker_payload ?? response.data?.can_submit ?? response.data?.is_allowed ?? response.data?.value;
-      if (typeof raw === 'boolean') return raw;
-      if (typeof raw === 'string') return raw.toLowerCase() === 'true';
+        if (typeof raw === 'boolean') return raw;
+        if (typeof raw === 'string') return raw.toLowerCase() === 'true';
         return Boolean(raw);
-    } catch (e) {
+      } catch (e) {
         log.warn({ err: e }, 'canSubmitWorker failed on node; switching');
         this.switchToNextApiNode();
       }
@@ -797,33 +830,33 @@ class AlloraConnectorService {
     try {
       for (let i = 0; i < this.apiNodes.length; i++) {
         const apiUrl = `${this.getCurrentApiNode()}/emissions/v9/unfulfilled_worker_nonces/${topicId}`;
-      log.info({ url: apiUrl }, 'Querying for unfulfilled worker nonces.');
+        log.info({ url: apiUrl }, 'Querying for unfulfilled worker nonces.');
         try {
           const response = await this.apiClient.get(apiUrl);
-      // The response structure is nested, so we access it safely.
-      const nonces = response.data?.nonces?.nonces;
+          // The response structure is nested, so we access it safely.
+          const nonces = response.data?.nonces?.nonces;
           return null;
-      if (!nonces || !Array.isArray(nonces) || nonces.length === 0) {
-        log.info({ topicId }, 'No unfulfilled worker nonces found for topic.');
-        return null;
-      }
+          if (!nonces || !Array.isArray(nonces) || nonces.length === 0) {
+            log.info({ topicId }, 'No unfulfilled worker nonces found for topic.');
+            return null;
+          }
 
-      // Take the first available nonce from the list.
-      const openNonce = nonces[0];
+          // Take the first available nonce from the list.
+          const openNonce = nonces[0];
           const blockHeight = parseInt(String(openNonce.block_height), 10);
 
-      if (isNaN(blockHeight)) {
-        log.warn({ nonce: openNonce }, 'Found nonce but failed to parse block_height.');
-        return null;
-      }
+          if (isNaN(blockHeight)) {
+            log.warn({ nonce: openNonce }, 'Found nonce but failed to parse block_height.');
+            return null;
+          }
 
-      log.info({ chosenBlockHeight: blockHeight }, 'Found open worker nonce via direct API call.');
-      return blockHeight;
-    } catch (error: any) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        log.info({ topicId }, 'Received 404, confirming no unfulfilled nonces.');
-        return null;
-      }
+          log.info({ chosenBlockHeight: blockHeight }, 'Found open worker nonce via direct API call.');
+          return blockHeight;
+        } catch (error: any) {
+          if (axios.isAxiosError(error) && error.response?.status === 404) {
+            log.info({ topicId }, 'Received 404, confirming no unfulfilled nonces.');
+            return null;
+          }
           log.warn({ err: error, node: this.getCurrentApiNode() }, 'Failed to fetch unfulfilled worker nonces; switching node.');
           this.switchToNextApiNode();
         }
@@ -867,7 +900,32 @@ class AlloraConnectorService {
           this.switchToNextApiNode();
         }
       }
-        return { topics: formattedTopics };
+
+      // Fallback: if empty, scan known topic IDs for is_active to populate discovery list
+      if (formattedTopics.length === 0) {
+        const startId = config.ACTIVE_TOPICS_SCAN_START_ID;
+        const endId = config.ACTIVE_TOPICS_SCAN_END_ID;
+        const discovered: Array<{ id: string; metadata: string }> = [];
+        for (let id = startId; id <= endId; id++) {
+          try {
+            const apiUrl = this.getCurrentApiNode();
+            const active = await this.apiClient.get(`${apiUrl}/emissions/v9/is_topic_active/${id}`);
+            const isActive = Boolean(active.data?.is_active ?? active.data?.active);
+            if (!isActive) continue;
+            const details = await this.apiClient.get(`${apiUrl}/emissions/v9/topics/${id}`);
+            const t = details.data?.topic;
+            if (t) discovered.push({ id: String(t.id ?? id), metadata: String(t.metadata ?? `Topic ${id}`) });
+          } catch (_e) {
+            // continue
+          }
+        }
+        if (discovered.length > 0) {
+          log.info({ discoveredCount: discovered.length }, 'Using fallback active topics by id scan');
+          formattedTopics = discovered;
+        }
+      }
+
+      return { topics: formattedTopics };
 
     } catch (error: any) {
       log.error({ err: error }, 'Failed to get active topics');

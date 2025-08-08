@@ -36,6 +36,11 @@ export function processChainError(error: any): ProcessedChainError {
     return { action: ChainErrorAction.SwitchNode };
   }
 
+  // Explicitly treat out-of-gas as retryable with adjusted gas on caller side
+  if (errorMessage.includes('out of gas')) {
+    return { action: ChainErrorAction.Retry };
+  }
+
   if (errorMessage.includes('insufficient funds') || errorMessage.includes('insufficient fee')) {
     logger.error('Unrecoverable error: Insufficient funds or fee.');
     return { action: ChainErrorAction.Fail };
