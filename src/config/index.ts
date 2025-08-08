@@ -73,6 +73,10 @@ const envSchema = z.object({
   // Rate Limiting Configuration
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000), // 15 minutes
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100), // Max requests per window
+
+  // Worker payload formatting behavior
+  BOUNDED_EXP40DEC_PRECISION: z.coerce.number().int().positive().default(18),
+  INVALID_MODEL_OUTPUT_POLICY: z.enum(['throw', 'skip', 'zero']).default('throw'),
 });
 
 /**

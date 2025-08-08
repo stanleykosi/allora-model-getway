@@ -8,9 +8,9 @@ option go_package = "github.com/gogo/protobuf/gogoproto";
 // Minimal gogoproto definitions for our needs
 extend google.protobuf.FieldOptions {
   bool nullable = 65001;
-  bool customtype = 65002;
+  string customtype = 65002;
 }
 
 extend google.protobuf.MessageOptions {
   bool equal = 65003;
-} 
+}

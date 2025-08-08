@@ -36,6 +36,7 @@ import { EnglishMnemonic, Bip39, Slip10, Slip10Curve, Slip10RawIndex } from '@co
 import * as yaml from 'js-yaml';
 import stableStringify from 'canonical-json';
 import { config } from '@/config';
+import { formatToBoundedExp40Dec } from './bounded-exp40dec';
 import logger from '@/utils/logger';
 import {
   AlloraBalance,
@@ -51,7 +52,6 @@ import {
   InputInferenceForecastBundle,
   InputForecastElement,
   InputWorkerDataBundle,
-  Nonce,
   InsertWorkerPayloadRequest
 } from '@/generated/allora_worker';
 
@@ -60,7 +60,8 @@ const execAsync = promisify(exec);
 // Define the type URLs for our custom messages. These must match the definitions on the Allora chain.
 // Note: Using v9 for worker payloads, v1 for legacy inference submissions
 const msgInsertInferenceTypeUrl = "/emissions.v1.MsgInsertInferences";
-const msgInsertWorkerPayloadTypeUrl = "/emissions.v9.MsgInsertWorkerPayload";
+// For ADR-031 style Msg service, the type URL is the fully-qualified request message name
+const msgInsertWorkerPayloadTypeUrl = "/emissions.v9.InsertWorkerPayloadRequest";
 
 class AlloraConnectorService {
   private readonly MAX_RETRIES = 3;
@@ -82,31 +83,11 @@ class AlloraConnectorService {
       registry.register(key, value as any);
     });
 
-    // Register our custom message types for inserting inferences and worker payloads.
-    // NOTE: The protobuf encoding/decoding logic is simplified
-    // here because the actual .proto files are not available. In a real-world scenario,
-    // these would be generated from the chain's protobuf definitions.
-    registry.register(msgInsertInferenceTypeUrl, {
-      encode: (message: any, writer: any) => {
-        // This is a simplified mock of protobuf encoding.
-        const encoded = {
-          sender: message.sender,
-          inferences: message.inferences.map((inf: any) => ({
-            topicId: inf.topicId,
-            blockHeight: inf.blockHeight,
-            value: inf.value
-          }))
-        };
-        writer.writeString(JSON.stringify(encoded));
-        return writer;
-      },
-      decode: (reader: any, length: any) => {
-        const json = reader.readString(length);
-        return JSON.parse(json);
-      },
-      fromPartial: (object: any) => object,
-    });
+    // Removed legacy mock registration for msgInsertInferenceTypeUrl; requires proper v1 protos
 
+
+    // Register v9 InsertWorkerPayloadRequest using generated encoder/decoder
+    registry.register(msgInsertWorkerPayloadTypeUrl, InsertWorkerPayloadRequest as any);
 
     this.registry = registry;
     logger.info('AlloraConnectorService initialized with custom message types.');
@@ -363,7 +344,10 @@ class AlloraConnectorService {
         }
 
         const gasPrice = GasPrice.fromString(this.TREASURY_GAS_PRICE);
-        const signingClient = await SigningStargateClient.connectWithSigner(config.ALLORA_RPC_URL, wallet, { gasPrice });
+        const signingClient = await SigningStargateClient.connectWithSigner(config.ALLORA_RPC_URL, wallet, {
+          registry: this.registry,
+          gasPrice,
+        });
 
         // Calculate the fee amount based on gas limit and gas price
         const gasLimit = parseInt(this.UNIVERSAL_GAS_LIMIT);
@@ -419,62 +403,8 @@ class AlloraConnectorService {
     gasPrice: string
   ): Promise<{ txHash: string } | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'submitInference', topicId });
-    let delay = this.INITIAL_DELAY_MS;
-
-    for (let i = 0; i < this.MAX_RETRIES; i++) {
-      try {
-        log.info({ attempt: i + 1, topicId }, 'Attempting to submit inference.');
-
-        const wallet = await DirectSecp256k1HdWallet.fromMnemonic(signingMnemonic, { prefix: 'allo' });
-        const [account] = await wallet.getAccounts();
-        const senderAddress = account.address;
-
-        const client = await SigningStargateClient.connectWithSigner(config.ALLORA_RPC_URL, wallet, {
-          gasPrice: GasPrice.fromString(gasPrice),
-        });
-
-        const latestBlock = await client.getBlock();
-
-        // Construct the custom message payload
-        const msg = {
-          sender: senderAddress,
-          inferences: [{
-            topicId: topicId,
-            blockHeight: latestBlock.header.height.toString(),
-            value: inferenceData.value,
-          }],
-        };
-
-        const message: EncodeObject = {
-          typeUrl: msgInsertInferenceTypeUrl,
-          value: msg,
-        };
-
-        const fee = {
-          amount: [], // Fee is calculated from gas limit and price
-          gas: this.INFERENCE_GAS_LIMIT,
-        };
-
-        log.debug({ message, fee }, "Broadcasting inference transaction");
-        const result = await client.signAndBroadcast(senderAddress, [message], fee, `Submitting inference for topic ${topicId}`);
-
-        if (isDeliverTxFailure(result)) {
-          throw new Error(`Inference transaction failed: ${result.rawLog}`);
-        }
-
-        log.info({ txHash: result.transactionHash, topicId }, 'Inference submission successful.');
-        return { txHash: result.transactionHash };
-
-      } catch (error) {
-        log.error({ err: error, attempt: i + 1 }, `Attempt ${i + 1} to submit inference failed.`);
-        if (i === this.MAX_RETRIES - 1) {
-          return null;
-        }
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2;
-      }
-    }
-    return null;
+    log.warn('submitInference (v1) is not supported without v1 protos. Use submitWorkerPayload (v9) instead.');
+    throw new Error('Legacy submitInference is unsupported: missing v1 message protos.');
   }
 
   /**
@@ -674,21 +604,31 @@ class AlloraConnectorService {
         senderAddress = account.address;
 
         const client = await SigningStargateClient.connectWithSigner(config.ALLORA_RPC_URL, wallet, {
+          registry: this.registry,
           gasPrice: GasPrice.fromString(gasPrice),
         });
 
-        const latestBlock = await client.getBlock();
-        const currentBlockHeight = latestBlock.header.height.toString();
-        const blockHeightStr = String(nonceHeight ?? currentBlockHeight);
+        // Determine target nonce height: prefer explicit param, else query API for open worker nonce
+        let targetNonceHeight: number | null = null;
+        if (typeof nonceHeight === 'number' && Number.isFinite(nonceHeight)) {
+          targetNonceHeight = nonceHeight;
+        } else {
+          targetNonceHeight = await this.deriveLatestOpenWorkerNonce(topicId);
+          if (targetNonceHeight == null) {
+            log.info({ topicId }, 'No open worker nonce available; skipping submission.');
+            return null;
+          }
+        }
+        const blockHeightStr = String(targetNonceHeight);
 
         // Construct the inference payload if inferenceValue is provided
         let inference: InputInference | undefined = undefined;
         if (workerResponse.inferenceValue) {
           inference = {
             topicId: Number(topicId), // Convert to uint64 as per protocol
-            blockHeight: Number(blockHeightStr), // Convert to int64 as per protocol
+            blockHeight: Number(blockHeightStr), // Convert to int64 as per protocol (nonce height)
             inferer: senderAddress,
-            value: workerResponse.inferenceValue,
+            value: formatToBoundedExp40Dec(workerResponse.inferenceValue),
             // Optional protocol fields - set explicit defaults for protobuf compatibility
             extraData: workerResponse.extraData || new Uint8Array(0), // Empty Uint8Array if not provided
             proof: workerResponse.proof || "", // Empty string if not provided
@@ -698,14 +638,25 @@ class AlloraConnectorService {
         // Construct the forecast payload if forecasts are provided
         let forecast: InputForecast | undefined = undefined;
         if (workerResponse.forecasts && workerResponse.forecasts.length > 0) {
-          const forecastElements: InputForecastElement[] = workerResponse.forecasts.map(f => ({
-            inferer: f.workerAddress,
-            value: f.forecastedValue,
-          }));
+          const forecastElements: InputForecastElement[] = [];
+          for (const f of workerResponse.forecasts) {
+            try {
+              forecastElements.push({ inferer: f.workerAddress, value: formatToBoundedExp40Dec(f.forecastedValue) });
+            } catch (e: any) {
+              if (e?.message === 'SKIP_SUBMISSION') {
+                logger.warn({ f }, 'Skipping invalid forecast element due to policy');
+                continue;
+              }
+              throw e;
+            }
+          }
+          if (forecastElements.length === 0) {
+            logger.warn('All forecast elements skipped by policy; omitting forecast');
+          }
 
           forecast = {
             topicId: Number(topicId), // Convert to uint64 as per protocol
-            blockHeight: Number(blockHeightStr), // Convert to int64 as per protocol
+            blockHeight: Number(blockHeightStr), // Convert to int64 as per protocol (nonce height)
             forecaster: senderAddress,
             forecastElements: forecastElements,
             // Optional protocol field - set explicit default for protobuf compatibility
@@ -882,34 +833,7 @@ class AlloraConnectorService {
     }
   }
 
-  /**
-   * Check if a worker nonce for a topic/block is unfulfilled (awaiting a worker response)
-   */
-  public async isWorkerNonceUnfulfilled(topicId: string, blockHeight: number): Promise<boolean> {
-    const log = logger.child({ service: 'AlloraConnectorService', method: 'isWorkerNonceUnfulfilled', topicId, blockHeight });
-    const command = `allorad query emissions worker-nonce-unfulfilled ${topicId} ${blockHeight}`;
-    const [stdout, error] = await this.execAsyncWithRetry(command);
-    if (error || !stdout) {
-      log.error({ err: error }, 'Failed to query worker-nonce-unfulfilled');
-      return false;
-    }
-    try {
-      const data: any = yaml.load(stdout);
-      const raw = (data?.is_worker_nonce_unfulfilled ?? data?.unfulfilled ?? data?.value ?? data?.result);
-      if (typeof raw === 'boolean') return raw;
-      if (typeof raw === 'string') return raw.toLowerCase() === 'true';
-      // Fallback: direct regex search for true/false
-      const m = String(stdout).match(/\b(true|false)\b/i);
-      if (m) return m[1].toLowerCase() === 'true';
-      return false;
-    } catch (e) {
-      // YAML may not parse; try regex directly
-      const m = String(stdout).match(/\bis_worker_nonce_unfulfilled:\s*(true|false)\b/i) || String(stdout).match(/\b(true|false)\b/i);
-      if (m) return m[1].toLowerCase() === 'true';
-      log.error({ err: e, stdout }, 'Failed to parse worker-nonce-unfulfilled output');
-      return false;
-    }
-  }
+  // isWorkerNonceUnfulfilled (CLI-based) removed in favor of API-based deriveLatestOpenWorkerNonce
 
   /**
    * Check whether a worker address can submit on a topic (whitelist/window check)

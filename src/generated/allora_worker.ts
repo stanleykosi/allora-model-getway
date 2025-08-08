@@ -6,13 +6,9 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { Nonce } from "./emissions/v3/nonce";
 
 export const protobufPackage = "emissions.v9";
-
-export interface Nonce {
-  /** block height of the request */
-  blockHeight: number;
-}
 
 export interface InputInference {
   topicId: number;
@@ -62,6 +58,7 @@ export interface InputWorkerDataBundles {
   workerDataBundles: InputWorkerDataBundle[];
 }
 
+/** Request/Response messages used by the gateway to submit the worker payload */
 export interface InsertWorkerPayloadRequest {
   sender: string;
   workerDataBundle: InputWorkerDataBundle | undefined;
@@ -69,64 +66,6 @@ export interface InsertWorkerPayloadRequest {
 
 export interface InsertWorkerPayloadResponse {
 }
-
-function createBaseNonce(): Nonce {
-  return { blockHeight: 0 };
-}
-
-export const Nonce: MessageFns<Nonce> = {
-  encode(message: Nonce, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.blockHeight !== 0) {
-      writer.uint32(8).int64(message.blockHeight);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): Nonce {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseNonce();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.blockHeight = longToNumber(reader.int64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): Nonce {
-    return { blockHeight: isSet(object.blockHeight) ? globalThis.Number(object.blockHeight) : 0 };
-  },
-
-  toJSON(message: Nonce): unknown {
-    const obj: any = {};
-    if (message.blockHeight !== 0) {
-      obj.blockHeight = Math.round(message.blockHeight);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<Nonce>, I>>(base?: I): Nonce {
-    return Nonce.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<Nonce>, I>>(object: I): Nonce {
-    const message = createBaseNonce();
-    message.blockHeight = object.blockHeight ?? 0;
-    return message;
-  },
-};
 
 function createBaseInputInference(): InputInference {
   return { topicId: 0, blockHeight: 0, inferer: "", value: "", extraData: new Uint8Array(0), proof: "" };
