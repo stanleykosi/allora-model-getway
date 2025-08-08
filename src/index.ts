@@ -22,6 +22,7 @@ import logger from './utils/logger';
 import inferenceScheduler from './core/scheduler/inference.scheduler';
 import performanceScheduler from './core/scheduler/performance.scheduler';
 import secretsService from './core/secrets/secrets.service';
+import alloraConnectorService from './core/allora-connector/allora-connector.service';
 
 const PORT = config.PORT;
 
@@ -66,6 +67,11 @@ const loadTreasuryMnemonic = async (): Promise<boolean> => {
  */
 const startServer = async () => {
   try {
+    // Network startup health check (non-blocking for server start)
+    await alloraConnectorService.performStartupHealthCheck?.().catch((e) => {
+      logger.warn({ err: e }, 'Startup health check reported a warning');
+    });
+
     // Try to load treasury mnemonic, but don't fail if it's not available
     const treasuryLoaded = await loadTreasuryMnemonic();
 

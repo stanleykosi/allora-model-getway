@@ -55,7 +55,7 @@ router.get(
 
 /**
  * @route GET /api/v1/models/debug
- * @description Debug endpoint to test allorad command execution.
+ * @description Debug endpoint to test API connectivity to the Allora network.
  * @access Protected
  */
 router.get(

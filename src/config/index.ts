@@ -47,7 +47,9 @@ const envSchema = z.object({
   REDIS_URL: z.string().url({ message: 'REDIS_URL must be a valid Redis connection URL.' }),
 
   // Allora Network Configuration
-  ALLORA_RPC_URL: z.string().url({ message: 'ALLORA_RPC_URL must be a valid RPC endpoint URL.' }),
+  // Comma-separated lists to support multi-node failover
+  ALLORA_API_URLS: z.string().min(1, { message: 'At least one Allora API URL is required (comma-separated).' }),
+  ALLORA_RPC_URLS: z.string().min(1, { message: 'At least one Allora RPC URL is required (comma-separated).' }),
   CHAIN_ID: z.string().min(1, { message: 'CHAIN_ID is required.' }).default('allora-testnet-1'),
   AVERAGE_BLOCK_TIME_SECONDS: z.coerce.number().int().positive().default(5),
 
@@ -77,6 +79,9 @@ const envSchema = z.object({
   // Worker payload formatting behavior
   BOUNDED_EXP40DEC_PRECISION: z.coerce.number().int().positive().default(18),
   INVALID_MODEL_OUTPUT_POLICY: z.enum(['throw', 'skip', 'zero']).default('throw'),
+
+  // Testing/Dev toggles
+  DRY_RUN_TRANSACTIONS: z.coerce.boolean().default(false),
 });
 
 /**

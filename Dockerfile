@@ -1,11 +1,6 @@
 # Use Node.js 22 Alpine for production (required for all packages)
 FROM node:22-alpine
 
-# Install allorad CLI tool
-RUN apk add --no-cache curl && \
-    curl -L https://github.com/allora-network/allora-chain/releases/download/v0.12.1/allora-chain_0.12.1_linux_amd64 -o /usr/local/bin/allorad && \
-    chmod +x /usr/local/bin/allorad
-
 # Set working directory
 WORKDIR /app
 

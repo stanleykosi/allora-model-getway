@@ -1,7 +1,7 @@
 /**
  * @description
  * This service is the sole gateway for all interactions with the Allora blockchain.
- * It abstracts the complexities of the `allorad` CLI tool and CosmJS libraries,
+ * It abstracts the complexities of the Allora network endpoints and CosmJS libraries,
  * providing a clean, Promise-based, and typed interface to the rest of the application.
  *
  * This service implements critical non-functional requirements:
@@ -11,7 +11,7 @@
  *   exponential backoff to handle transient network or RPC node issues.
  *
  * @dependencies
- * - child_process: To execute `allorad` shell commands for queries.
+ * - axios: To query API (LCD) endpoints directly.
  * - @cosmjs/stargate: For building, signing, and broadcasting transactions.
  * - @cosmjs/proto-signing: For wallet generation from mnemonics and handling custom messages.
  * - @/config: For accessing the Allora RPC URL and other chain configs.
@@ -19,29 +19,26 @@
  * - ./allora-connector.types: For typing the parsed JSON outputs.
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import {
   SigningStargateClient,
   GasPrice,
   Coin,
   DeliverTxResponse,
   isDeliverTxFailure,
-  defaultRegistryTypes
+  defaultRegistryTypes,
+  calculateFee,
 } from '@cosmjs/stargate';
 import { DirectSecp256k1HdWallet, Registry, EncodeObject } from '@cosmjs/proto-signing';
 import { Secp256k1, sha256 } from '@cosmjs/crypto';
 import { EnglishMnemonic, Bip39, Slip10, Slip10Curve, Slip10RawIndex } from '@cosmjs/crypto';
-import * as yaml from 'js-yaml';
-import stableStringify from 'canonical-json';
+// yaml no longer needed; all queries via API
 import { config } from '@/config';
 import { formatToBoundedExp40Dec } from './bounded-exp40dec';
 import logger from '@/utils/logger';
 import {
   AlloraBalance,
   TopicDetails,
-  ExecResult,
   AlloraWorkerPerformance,
   AlloraEmaScore,
   WorkerResponsePayload
@@ -54,12 +51,11 @@ import {
   InputWorkerDataBundle,
   InsertWorkerPayloadRequest
 } from '@/generated/allora_worker';
+import { processChainError, ChainErrorAction } from './chain-error.handler';
 
-const execAsync = promisify(exec);
+// Removed CLI execution; all queries use API and transactions use RPC
 
 // Define the type URLs for our custom messages. These must match the definitions on the Allora chain.
-// Note: Using v9 for worker payloads, v1 for legacy inference submissions
-const msgInsertInferenceTypeUrl = "/emissions.v1.MsgInsertInferences";
 // For ADR-031 style Msg service, the type URL is the fully-qualified request message name
 const msgInsertWorkerPayloadTypeUrl = "/emissions.v9.InsertWorkerPayloadRequest";
 
@@ -75,6 +71,18 @@ class AlloraConnectorService {
 
   private readonly registry: Registry;
 
+  // Multi-node API/RPC management
+  private readonly apiClient: AxiosInstance;
+  private apiNodes: string[] = [];
+  private rpcNodes: string[] = [];
+  private currentApiNodeIndex = 0;
+  private currentRpcNodeIndex = 0;
+
+  // Cached chain minimum gas price (TTL-based)
+  private cachedMinGasPrice: string | null = null;
+  private cachedMinGasFetchedAt = 0;
+  private readonly MIN_GAS_PRICE_CACHE_MS = 60_000; // 60s
+
   constructor() {
     // Create a new Registry instance, including all default Cosmos SDK message types
     const registry = new Registry();
@@ -83,79 +91,90 @@ class AlloraConnectorService {
       registry.register(key, value as any);
     });
 
-    // Removed legacy mock registration for msgInsertInferenceTypeUrl; requires proper v1 protos
-
-
     // Register v9 InsertWorkerPayloadRequest using generated encoder/decoder
     registry.register(msgInsertWorkerPayloadTypeUrl, InsertWorkerPayloadRequest as any);
 
     this.registry = registry;
-    logger.info('AlloraConnectorService initialized with custom message types.');
+
+    // Initialize multi-node config
+    this.apiNodes = config.ALLORA_API_URLS.split(',').map((u) => u.trim().replace(/\/$/, ''));
+    this.rpcNodes = config.ALLORA_RPC_URLS.split(',').map((u) => u.trim());
+    if (this.apiNodes.length === 0 || this.rpcNodes.length === 0) {
+      throw new Error('At least one API and one RPC node URL must be configured.');
+    }
+
+    // Initialize axios client
+    this.apiClient = axios.create({
+      timeout: 10000,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    logger.info({ apiNodes: this.apiNodes, rpcNodes: this.rpcNodes }, 'AlloraConnectorService initialized with multi-node support and custom message types.');
   }
 
 
-  /**
-   * Executes a shell command with a robust retry mechanism.
-   * This is the core function for all blockchain queries.
-   * @param command The full shell command to execute.
-   * @returns A Promise resolving to an ExecResult tuple.
-   */
-  private async execAsyncWithRetry(command: string): Promise<ExecResult> {
-    let delay = this.INITIAL_DELAY_MS;
-    for (let i = 0; i < this.MAX_RETRIES; i++) {
-      try {
-        logger.debug({ attempt: i + 1, command }, 'Executing allorad command');
+  // Removed CLI execution helper; retained for history in git
 
-        // First, let's check if allorad is available
-        if (i === 0) {
-          try {
-            const { stdout: versionOutput } = await execAsync('allorad version', {
-              env: {
-                ...process.env,
-                ALLORA_CHAIN_ID: config.CHAIN_ID,
-                ALLORA_RPC_URL: config.ALLORA_RPC_URL
-              }
-            });
-            logger.info({ versionOutput }, 'Allorad version check successful');
-          } catch (versionError) {
-            logger.error({ versionError }, 'Allorad version check failed - binary may not be available');
-          }
-        }
+  // Node management helpers
+  private getCurrentApiNode = (): string => this.apiNodes[this.currentApiNodeIndex];
+  private getCurrentRpcNode = (): string => this.rpcNodes[this.currentRpcNodeIndex];
 
-        // Log the environment variables being used
-        logger.debug({
-          ALLORA_CHAIN_ID: config.CHAIN_ID,
-          ALLORA_RPC_URL: config.ALLORA_RPC_URL
-        }, 'Allorad environment configuration');
+  private switchToNextApiNode = (): string => {
+    this.currentApiNodeIndex = (this.currentApiNodeIndex + 1) % this.apiNodes.length;
+    const newNode = this.getCurrentApiNode();
+    logger.warn({ newNode }, 'Switched to next Allora API node due to a failure.');
+    // Invalidate cached min gas price when switching nodes
+    this.cachedMinGasPrice = null;
+    this.cachedMinGasFetchedAt = 0;
+    return newNode;
+  };
 
-        const { stdout, stderr } = await execAsync(command, {
-          env: {
-            ...process.env,
-            ALLORA_CHAIN_ID: config.CHAIN_ID,
-            ALLORA_RPC_URL: config.ALLORA_RPC_URL,
+  private switchToNextRpcNode = (): string => {
+    this.currentRpcNodeIndex = (this.currentRpcNodeIndex + 1) % this.rpcNodes.length;
+    const newNode = this.getCurrentRpcNode();
+    logger.warn({ newNode }, 'Switched to next Allora RPC node due to a failure.');
+    return newNode;
+  };
+
+  private async getEffectiveGasPrice(fallbackGasPrice: string): Promise<GasPrice> {
+    const parse = (s: string) => {
+      const m = String(s).trim().match(/^(\d*\.?\d+)([a-zA-Z/]+)$/);
+      if (!m) return null as unknown as { amount: number; denom: string };
+      return { amount: Number(m[1]), denom: m[2] } as { amount: number; denom: string };
+    };
+
+    // Use cached value if still fresh
+    const now = Date.now();
+    let chainMin: string | null = null;
+    if (this.cachedMinGasPrice && now - this.cachedMinGasFetchedAt < this.MIN_GAS_PRICE_CACHE_MS) {
+      chainMin = this.cachedMinGasPrice;
+    } else {
+      for (let i = 0; i < this.apiNodes.length; i++) {
+        try {
+          const apiUrl = this.getCurrentApiNode();
+          const res = await this.apiClient.get(`${apiUrl}/cosmos/base/node/v1beta1/config`);
+          const min = res.data?.minimum_gas_price || res.data?.min_gas_price || res.data?.config?.minimum_gas_price;
+          if (typeof min === 'string' && min.length > 0) {
+            chainMin = min.split(',')[0].trim();
+            this.cachedMinGasPrice = chainMin;
+            this.cachedMinGasFetchedAt = now;
+            break;
           }
-        });
-        logger.debug({ stdout, stderr, command }, 'Allorad command completed');
-        if (stderr) {
-          if (stderr.toLowerCase().includes('error')) {
-            throw new Error(stderr);
-          }
-          logger.warn({ stderr, command }, 'Stderr reported from allorad command');
+        } catch (_e) {
+          this.switchToNextApiNode();
         }
-        return [stdout, null];
-      } catch (error) {
-        logger.error(
-          { err: error, attempt: i + 1, command, errorMessage: (error as Error).message },
-          `Attempt ${i + 1} failed for command.`
-        );
-        if (i === this.MAX_RETRIES - 1) {
-          return [null, error as Error];
-        }
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        delay *= 2;
       }
     }
-    return [null, new Error('Exhausted all retries.')];
+
+    const fb = parse(fallbackGasPrice) || { amount: 0, denom: 'uallo' };
+    const cm = chainMin ? parse(chainMin) : null;
+    if (cm && cm.denom === fb.denom) {
+      const amt = Math.max(cm.amount, fb.amount);
+      return GasPrice.fromString(`${amt}${fb.denom}`);
+    }
+    // Prefer chain denom if present, else fallback
+    if (cm) return GasPrice.fromString(`${Math.max(cm.amount, fb.amount)}${cm.denom}`);
+    return GasPrice.fromString(fallbackGasPrice);
   }
 
   /**
@@ -181,68 +200,34 @@ class AlloraConnectorService {
    * @returns A promise resolving to TopicDetails or null if not found/error.
    */
   public async getTopicDetails(topicId: string): Promise<TopicDetails | null> {
-    const getTopicCmd = `allorad query emissions topic ${topicId}`;
-    const [topicStdout, topicErr] = await this.execAsyncWithRetry(getTopicCmd);
-
-    if (topicErr) {
-      logger.error({ err: topicErr, topicId }, 'Failed to get topic details from chain.');
-      return null;
-    }
-
-    const isActiveCmd = `allorad query emissions is-topic-active ${topicId}`;
-    const [activeStdout, activeErr] = await this.execAsyncWithRetry(isActiveCmd);
-
-    if (activeErr) {
-      logger.error({ err: activeErr, topicId }, 'Failed to check if topic is active.');
-      return null;
-    }
-
-    try {
-      // Parse the isActive response (JSON)
-      // Try YAML/text first; some nodes may not return JSON
-      let isActive = false;
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'getTopicDetails', topicId });
+    for (let i = 0; i < this.apiNodes.length; i++) {
       try {
-        const activeYaml: any = yaml.load(activeStdout!);
-        const raw = activeYaml?.is_topic_active ?? activeYaml?.active ?? activeYaml?.value ?? activeYaml?.result;
-        if (typeof raw === 'boolean') isActive = raw;
-        else if (typeof raw === 'string') isActive = raw.toLowerCase() === 'true';
-      } catch { }
-      // Fallback: JSON parse if applicable
-      if (!isActive) {
-        try {
-          const isActiveData = JSON.parse(activeStdout!);
-          isActive = typeof isActiveData === 'boolean' ? isActiveData : Boolean(isActiveData.is_active ?? isActiveData.value);
-        } catch { }
-      }
+        const apiUrl = this.getCurrentApiNode();
+        const topicResponse = await this.apiClient.get(`${apiUrl}/emissions/v9/topics/${topicId}`);
+        const topicData = topicResponse.data?.topic;
 
-      // Parse the topic response using proper YAML parser
-      const topicData = yaml.load(topicStdout!.trim()) as any;
+        const activeResponse = await this.apiClient.get(`${apiUrl}/emissions/v9/is_topic_active/${topicId}`);
+        const isActive = Boolean(activeResponse.data?.is_active ?? activeResponse.data?.active);
 
-      // Extract topic information from the parsed YAML
-      const topic = topicData.topic;
-      const topicId = topic?.id;
-      const epochLength = parseInt(topic?.epoch_length || '0', 10);
-      const creator = topic?.creator;
-      const metadata = topic?.metadata;
-
-      logger.debug({ topicId, epochLength, creator, metadata, isActive, topicStdout }, 'Parsed topic details');
-
-      if (!topicId || !epochLength || !creator) {
-        logger.warn({ topicId: topicId, epochLength, creator, output: topicStdout }, 'Topic data incomplete in chain response.');
-        return null;
-      }
+        if (!topicData) throw new Error('Missing topic data in response');
 
       return {
-        id: topicId,
-        epochLength: epochLength,
-        isActive: isActive,
-        creator: creator,
-        metadata: metadata,
-      };
-    } catch (parseError) {
-      logger.error({ err: parseError, topicId, activeStdout }, 'Failed to parse allorad output.');
-      return null;
+          id: String(topicData.id ?? topicData.topic_id ?? topicId),
+          epochLength: parseInt(String(topicData.epoch_length ?? '0'), 10),
+          workerSubmissionWindow: topicData.worker_submission_window ? parseInt(String(topicData.worker_submission_window), 10) : undefined,
+          epochLastEnded: topicData.epoch_last_ended ? parseInt(String(topicData.epoch_last_ended), 10) : undefined,
+          isActive,
+          creator: String(topicData.creator ?? ''),
+          metadata: String(topicData.metadata ?? ''),
+        };
+      } catch (error) {
+        log.warn({ err: error, node: this.getCurrentApiNode(), topicId }, 'Failed to get topic details from node.');
+        this.switchToNextApiNode();
+      }
     }
+    log.error({ topicId }, 'Failed to get topic details from all available API nodes.');
+    return null;
   }
 
   /**
@@ -251,28 +236,20 @@ class AlloraConnectorService {
    * @returns A promise resolving to the balance as a number, or null on error.
    */
   public async getAccountBalance(address: string): Promise<number | null> {
-    const command = `allorad query bank balances ${address} --output json --node ${config.ALLORA_RPC_URL}`;
-    const [stdout, error] = await this.execAsyncWithRetry(command);
-
-    if (error) {
-      logger.error({ err: error, address }, 'Failed to get account balance.');
-      return null;
-    }
-
-    try {
-      const balanceData = JSON.parse(stdout!) as { balances: AlloraBalance[] };
-      const alloBalance = balanceData.balances.find((b) => b.denom === 'uallo');
-
-      if (!alloBalance) {
-        logger.warn({ address }, 'uallo balance not found for address, returning 0.');
-        return 0;
+    for (let i = 0; i < this.apiNodes.length; i++) {
+      try {
+        const apiUrl = this.getCurrentApiNode();
+        const response = await this.apiClient.get(`${apiUrl}/cosmos/bank/v1beta1/balances/${address}`);
+        const balances: AlloraBalance[] = response.data?.balances ?? [];
+        const alloBalance = balances.find((b) => b.denom === 'uallo');
+        return alloBalance ? parseInt(String(alloBalance.amount), 10) : 0;
+      } catch (error) {
+        logger.warn({ err: error, address, node: this.getCurrentApiNode() }, 'Failed to get account balance from node.');
+        this.switchToNextApiNode();
       }
-
-      return parseInt(alloBalance.amount, 10);
-    } catch (parseError) {
-      logger.error({ err: parseError, address }, 'Failed to parse balance output.');
-      return null;
     }
+    logger.error({ address }, 'Failed to get account balance from all API nodes');
+      return null;
   }
 
   /**
@@ -289,16 +266,18 @@ class AlloraConnectorService {
     try {
       log.info('Fetching worker performance from Allora network');
 
-      const getEmaScoreCmd = `allorad query emissions inferer-score-ema ${topicId} ${workerAddress} --node ${config.ALLORA_RPC_URL}`;
-      const [stdout, error] = await this.execAsyncWithRetry(getEmaScoreCmd);
-
-      if (error) {
-        log.error({ err: error }, 'Failed to get worker performance');
-        return null;
+      let emaScoreData: AlloraEmaScore | null = null;
+      for (let i = 0; i < this.apiNodes.length; i++) {
+        try {
+          const apiUrl = this.getCurrentApiNode();
+          const res = await this.apiClient.get(`${apiUrl}/emissions/v9/inferer_score_ema/${topicId}/${workerAddress}`);
+          emaScoreData = res.data as AlloraEmaScore;
+          break;
+        } catch (e) {
+          this.switchToNextApiNode();
+        }
       }
-
-      // Parse the JSON output
-      const emaScoreData = JSON.parse(stdout!.trim()) as AlloraEmaScore;
+      if (!emaScoreData) return null;
 
       log.info('Successfully retrieved worker performance');
       return {
@@ -343,21 +322,30 @@ class AlloraConnectorService {
           throw new Error(`Invalid amount format: ${amount}`);
         }
 
-        const gasPrice = GasPrice.fromString(this.TREASURY_GAS_PRICE);
-        const signingClient = await SigningStargateClient.connectWithSigner(config.ALLORA_RPC_URL, wallet, {
+        const signingClient = await SigningStargateClient.connectWithSigner(this.getCurrentRpcNode(), wallet, {
           registry: this.registry,
-          gasPrice,
+          gasPrice: await this.getEffectiveGasPrice(this.TREASURY_GAS_PRICE),
         });
 
-        // Calculate the fee amount based on gas limit and gas price
-        const gasLimit = parseInt(this.UNIVERSAL_GAS_LIMIT);
-        const gasPriceAmount = parseInt(this.TREASURY_GAS_PRICE.replace('uallo', ''));
-        const feeAmount = gasLimit * gasPriceAmount;
+        // Simulate to estimate gas
+        let gasLimit = parseInt(this.UNIVERSAL_GAS_LIMIT, 10);
+        try {
+          const simulated = await signingClient.simulate(
+            fromAccount.address,
+            [
+              {
+                typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+                value: { fromAddress: fromAccount.address, toAddress, amount: [coinsToSend] },
+              } as any,
+            ],
+            undefined
+          );
+          gasLimit = Math.ceil(Number(simulated) * 1.2);
+        } catch (e) {
+          log.warn({ err: e }, 'Simulation failed for transferFunds; using default gas limit');
+        }
 
-        const fee = {
-          amount: [{ denom: 'uallo', amount: feeAmount.toString() }],
-          gas: this.UNIVERSAL_GAS_LIMIT,
-        };
+        const fee = calculateFee(gasLimit, await this.getEffectiveGasPrice(this.TREASURY_GAS_PRICE));
 
         const result: DeliverTxResponse = await signingClient.sendTokens(
           fromAccount.address,
@@ -375,10 +363,10 @@ class AlloraConnectorService {
         return { txHash: result.transactionHash };
 
       } catch (error) {
-        log.error({ err: error, attempt: i + 1 }, `Attempt ${i + 1} to transfer funds failed.`);
-        if (i === this.MAX_RETRIES - 1) {
-          return null;
-        }
+        log.warn({ err: error, attempt: i + 1 }, 'Transfer funds attempt failed');
+        const decision = processChainError(error);
+        if (decision.action === ChainErrorAction.Fail) return null;
+        if (decision.action === ChainErrorAction.SwitchNode) this.switchToNextRpcNode();
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2;
       }
@@ -386,26 +374,7 @@ class AlloraConnectorService {
     return null;
   }
 
-  /**
- * Constructs, signs, and broadcasts a transaction to submit an inference
- * for a specific topic to the Allora chain.
- *
- * @param signingMnemonic The mnemonic of the model's isolated wallet.
- * @param topicId The ID of the topic to submit the inference to.
- * @param inferenceData The inference data from the model's webhook.
- * @param gasPrice The gas price to use, respecting the user's `max_gas_price`.
- * @returns A promise resolving to an object with the transaction hash, or null on failure.
- */
-  public async submitInference(
-    signingMnemonic: string,
-    topicId: string,
-    inferenceData: { value: string },
-    gasPrice: string
-  ): Promise<{ txHash: string } | null> {
-    const log = logger.child({ service: 'AlloraConnectorService', method: 'submitInference', topicId });
-    log.warn('submitInference (v1) is not supported without v1 protos. Use submitWorkerPayload (v9) instead.');
-    throw new Error('Legacy submitInference is unsupported: missing v1 message protos.');
-  }
+  // Legacy submitInference (v1) removed; use submitWorkerPayload (v9)
 
   /**
    * Get latest network inferences for a topic
@@ -416,16 +385,17 @@ class AlloraConnectorService {
     try {
       log.info('Fetching latest network inferences from Allora network');
 
-      const command = `allorad query emissions latest-network-inferences ${topicId}`;
-      const [stdout, error] = await this.execAsyncWithRetry(command);
-
-      if (error) {
-        log.error({ err: error }, 'Failed to get latest network inferences');
-        return {};
+      let latestInferences: any = {};
+      for (let i = 0; i < this.apiNodes.length; i++) {
+        try {
+          const apiUrl = this.getCurrentApiNode();
+          const res = await this.apiClient.get(`${apiUrl}/emissions/v9/latest_network_inferences/${topicId}`);
+          latestInferences = res.data;
+          break;
+        } catch (e) {
+          this.switchToNextApiNode();
+        }
       }
-
-      // Parse the JSON output
-      const latestInferences = JSON.parse(stdout!.trim());
 
       log.info('Successfully retrieved latest network inferences');
       return latestInferences;
@@ -445,16 +415,17 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active inferers from Allora network');
 
-      const command = `allorad query emissions active-inferers ${topicId}`;
-      const [stdout, error] = await this.execAsyncWithRetry(command);
-
-      if (error) {
-        log.error({ err: error }, 'Failed to get active inferers');
-        return {};
+      let activeInferers: any = {};
+      for (let i = 0; i < this.apiNodes.length; i++) {
+        try {
+          const apiUrl = this.getCurrentApiNode();
+          const res = await this.apiClient.get(`${apiUrl}/emissions/v9/active_inferers/${topicId}`);
+          activeInferers = res.data;
+          break;
+        } catch (e) {
+          this.switchToNextApiNode();
+        }
       }
-
-      // Parse the JSON output
-      const activeInferers = JSON.parse(stdout!.trim());
 
       log.info('Successfully retrieved active inferers');
       return activeInferers;
@@ -474,16 +445,17 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active forecasters from Allora network');
 
-      const command = `allorad query emissions active-forecasters ${topicId}`;
-      const [stdout, error] = await this.execAsyncWithRetry(command);
-
-      if (error) {
-        log.error({ err: error }, 'Failed to get active forecasters');
-        return {};
+      let activeForecasters: any = {};
+      for (let i = 0; i < this.apiNodes.length; i++) {
+        try {
+          const apiUrl = this.getCurrentApiNode();
+          const res = await this.apiClient.get(`${apiUrl}/emissions/v9/active_forecasters/${topicId}`);
+          activeForecasters = res.data;
+          break;
+        } catch (e) {
+          this.switchToNextApiNode();
+        }
       }
-
-      // Parse the JSON output
-      const activeForecasters = JSON.parse(stdout!.trim());
 
       log.info('Successfully retrieved active forecasters');
       return activeForecasters;
@@ -503,16 +475,17 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active reputers from Allora network');
 
-      const command = `allorad query emissions active-reputers ${topicId}`;
-      const [stdout, error] = await this.execAsyncWithRetry(command);
-
-      if (error) {
-        log.error({ err: error }, 'Failed to get active reputers');
-        return {};
+      let activeReputers: any = {};
+      for (let i = 0; i < this.apiNodes.length; i++) {
+        try {
+          const apiUrl = this.getCurrentApiNode();
+          const res = await this.apiClient.get(`${apiUrl}/emissions/v9/active_reputers/${topicId}`);
+          activeReputers = res.data;
+          break;
+        } catch (e) {
+          this.switchToNextApiNode();
+        }
       }
-
-      // The active-reputers command returns YAML format, not JSON
-      const activeReputers = yaml.load(stdout!.trim()) as any;
 
       log.info('Successfully retrieved active reputers');
       return activeReputers;
@@ -603,9 +576,9 @@ class AlloraConnectorService {
         const [account] = await wallet.getAccounts();
         senderAddress = account.address;
 
-        const client = await SigningStargateClient.connectWithSigner(config.ALLORA_RPC_URL, wallet, {
+        const client = await SigningStargateClient.connectWithSigner(this.getCurrentRpcNode(), wallet, {
           registry: this.registry,
-          gasPrice: GasPrice.fromString(gasPrice),
+          gasPrice: await this.getEffectiveGasPrice(gasPrice),
         });
 
         // Determine target nonce height: prefer explicit param, else query API for open worker nonce
@@ -721,12 +694,22 @@ class AlloraConnectorService {
           }),
         };
 
-        const fee = {
-          amount: [], // Fee calculated from gas limit and price
-          gas: this.INFERENCE_GAS_LIMIT,
-        };
+        // Simulate via API to estimate gas, then compute dynamic fee
+        let gasLimit = parseInt(this.INFERENCE_GAS_LIMIT, 10);
+        try {
+          const apiUrl = this.getCurrentApiNode();
+          // Sign with dummy fee to get tx bytes
+          const accountInfo = await client.getSequence(senderAddress);
+          const anyMsgs = [message as any];
+          const simulated = await client.simulate(senderAddress, anyMsgs, undefined);
+          gasLimit = Math.ceil(Number(simulated) * 1.2);
+        } catch (e) {
+          log.warn({ err: e }, 'Simulation failed; falling back to default gas limit');
+        }
 
-        log.debug({ message, fee }, "Broadcasting worker payload transaction");
+        const fee = calculateFee(gasLimit, await this.getEffectiveGasPrice(gasPrice));
+
+        log.debug({ message, fee }, 'Broadcasting worker payload transaction');
         const result = await client.signAndBroadcast(senderAddress, [message], fee, `Submitting worker payload for topic ${topicId}`);
 
         if (isDeliverTxFailure(result)) {
@@ -742,15 +725,12 @@ class AlloraConnectorService {
         return { txHash: result.transactionHash };
 
       } catch (error) {
-        log.error({
-          err: error,
-          attempt: i + 1,
-          // Add any extra context available at this point
-          signingAddress: senderAddress || 'unknown'
-        }, `Attempt ${i + 1} to submit worker payload failed.`
-        );
-        if (i === this.MAX_RETRIES - 1) {
-          return null;
+        log.warn({ err: error, attempt: i + 1, signingAddress: senderAddress || 'unknown' }, 'Submission attempt failed');
+        const decision = processChainError(error);
+        if (decision.action === ChainErrorAction.Fail) return null;
+        if (decision.action === ChainErrorAction.SwitchNode) {
+          this.switchToNextRpcNode();
+          this.switchToNextApiNode();
         }
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2;
@@ -765,74 +745,26 @@ class AlloraConnectorService {
    */
   public async getCurrentBlockHeight(): Promise<number | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'getCurrentBlockHeight' });
-
-    const tryParse = (text: string | null): number | null => {
-      if (!text) return null;
-      // Prefer YAML header.height: "N"
-      const m = text.match(/\bheight:\s*"(\d+)"/);
-      if (m && m[1]) {
-        const n = Number(m[1]);
-        return Number.isFinite(n) ? n : null;
+    for (let i = 0; i < this.apiNodes.length; i++) {
+      try {
+        const apiUrl = this.getCurrentApiNode();
+        const response = await this.apiClient.get(`${apiUrl}/cosmos/base/tendermint/v1beta1/blocks/latest`);
+        const heightStr = response?.data?.block?.header?.height;
+        const height = parseInt(String(heightStr), 10);
+        if (!Number.isNaN(height)) {
+          log.info({ height }, 'Successfully fetched current block height.');
+          return height;
+        }
+      } catch (error) {
+        log.warn({ err: error, node: this.getCurrentApiNode() }, 'Failed to get block height from node.');
+        this.switchToNextApiNode();
       }
-      // Some nodes may print a simple number or other formats; attempt a generic digits grab
-      const m2 = text.match(/\b(\d{3,})\b/);
-      if (m2 && m2[1]) {
-        const n2 = Number(m2[1]);
-        if (Number.isFinite(n2)) return n2;
-      }
-      return null;
-    };
-
-    // 1) Preferred: `--type=height`
-    const cmdHeight = `allorad query block --type=height`;
-    const [out1] = await this.execAsyncWithRetry(cmdHeight);
-    let parsed = tryParse(out1);
-
-    // 2) Fallback: generic `block` parsing
-    if (parsed == null) {
-      const cmdFallback = `allorad query block`;
-      const [out2] = await this.execAsyncWithRetry(cmdFallback);
-      parsed = tryParse(out2);
     }
-
-    if (parsed == null) {
-      log.error({ out1 }, 'Failed to parse current block height from CLI output');
+    log.error('Failed to get current block height from all available API nodes.');
       return null;
     }
 
-    log.info({ height: parsed }, 'Current block height');
-    return parsed;
-  }
-
-  /**
-   * Get topic timing information (epoch_length, worker_submission_window, epoch_last_ended)
-   * Command: `allorad query emissions topic <topicId>` (YAML/text)
-   */
-  public async getTopicInfo(topicId: string): Promise<{ epochLength: number; workerSubmissionWindow: number; epochLastEnded: number } | null> {
-    const log = logger.child({ service: 'AlloraConnectorService', method: 'getTopicInfo', topicId });
-    const command = `allorad query emissions topic ${topicId}`;
-    const [stdout, error] = await this.execAsyncWithRetry(command);
-    if (error || !stdout) {
-      log.error({ err: error }, 'Failed to get topic info');
-      return null;
-    }
-    try {
-      const data = yaml.load(stdout) as any;
-      const t = data?.topic ?? {};
-      const epochLength = Number(t.epoch_length);
-      const workerWindow = Number(t.worker_submission_window);
-      const epochLastEnded = Number(t.epoch_last_ended);
-      if (![epochLength, workerWindow, epochLastEnded].every(Number.isFinite)) {
-        throw new Error('Missing or invalid numeric fields in topic');
-      }
-      log.info({ epochLength, workerWindow, epochLastEnded }, 'Parsed topic info');
-      return { epochLength, workerSubmissionWindow: workerWindow, epochLastEnded };
-    } catch (e) {
-      log.error({ err: e, stdout }, 'Failed to parse topic YAML');
-      return null;
-    }
-  }
-
+  // Topic timing information is available via getTopicDetails
   // isWorkerNonceUnfulfilled (CLI-based) removed in favor of API-based deriveLatestOpenWorkerNonce
 
   /**
@@ -840,26 +772,21 @@ class AlloraConnectorService {
    */
   public async canSubmitWorker(topicId: string, workerAddress: string): Promise<boolean> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'canSubmitWorker', topicId, workerAddress });
-    const command = `allorad query emissions can-submit-worker-payload ${topicId} ${workerAddress}`;
-    const [stdout, error] = await this.execAsyncWithRetry(command);
-    if (error || !stdout) {
-      log.warn({ err: error }, 'can-submit-worker-payload failed; defaulting to true');
-      return true; // graceful fallback
-    }
-    try {
-      const data: any = yaml.load(stdout);
-      const raw = (data?.can_submit_worker_payload ?? data?.can_submit ?? data?.value ?? data?.result);
+    for (let i = 0; i < this.apiNodes.length; i++) {
+      try {
+        const apiUrl = this.getCurrentApiNode();
+        const response = await this.apiClient.get(`${apiUrl}/emissions/v9/can_submit_worker_payload/${topicId}/${workerAddress}`);
+        const raw = response.data?.can_submit_worker_payload ?? response.data?.can_submit ?? response.data?.is_allowed ?? response.data?.value;
       if (typeof raw === 'boolean') return raw;
       if (typeof raw === 'string') return raw.toLowerCase() === 'true';
-      const m = String(stdout).match(/\b(true|false)\b/i);
-      if (m) return m[1].toLowerCase() === 'true';
-      return true;
+        return Boolean(raw);
     } catch (e) {
-      const m = String(stdout).match(/\bcan_submit_worker_payload:\s*(true|false)\b/i) || String(stdout).match(/\b(true|false)\b/i);
-      if (m) return m[1].toLowerCase() === 'true';
-      log.warn({ err: e, stdout }, 'Failed to parse can-submit-worker-payload; defaulting to true');
-      return true;
+        log.warn({ err: e }, 'canSubmitWorker failed on node; switching');
+        this.switchToNextApiNode();
+      }
     }
+    log.warn('canSubmitWorker failed on all nodes; defaulting to true');
+    return true;
   }
 
   /**
@@ -867,15 +794,15 @@ class AlloraConnectorService {
    */
   public async deriveLatestOpenWorkerNonce(topicId: string): Promise<number | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'deriveLatestOpenWorkerNonce', topicId });
-    const apiUrl = `https://allora-api.testnet.allora.network/emissions/v9/unfulfilled_worker_nonces/${topicId}`;
-
     try {
+      for (let i = 0; i < this.apiNodes.length; i++) {
+        const apiUrl = `${this.getCurrentApiNode()}/emissions/v9/unfulfilled_worker_nonces/${topicId}`;
       log.info({ url: apiUrl }, 'Querying for unfulfilled worker nonces.');
-      const response = await axios.get(apiUrl);
-
+        try {
+          const response = await this.apiClient.get(apiUrl);
       // The response structure is nested, so we access it safely.
       const nonces = response.data?.nonces?.nonces;
-
+          return null;
       if (!nonces || !Array.isArray(nonces) || nonces.length === 0) {
         log.info({ topicId }, 'No unfulfilled worker nonces found for topic.');
         return null;
@@ -883,7 +810,7 @@ class AlloraConnectorService {
 
       // Take the first available nonce from the list.
       const openNonce = nonces[0];
-      const blockHeight = parseInt(openNonce.block_height, 10);
+          const blockHeight = parseInt(String(openNonce.block_height), 10);
 
       if (isNaN(blockHeight)) {
         log.warn({ nonce: openNonce }, 'Found nonce but failed to parse block_height.');
@@ -892,13 +819,18 @@ class AlloraConnectorService {
 
       log.info({ chosenBlockHeight: blockHeight }, 'Found open worker nonce via direct API call.');
       return blockHeight;
-
     } catch (error: any) {
-      // Check for a 404 error, which simply means no nonces exist.
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         log.info({ topicId }, 'Received 404, confirming no unfulfilled nonces.');
         return null;
       }
+          log.warn({ err: error, node: this.getCurrentApiNode() }, 'Failed to fetch unfulfilled worker nonces; switching node.');
+          this.switchToNextApiNode();
+        }
+      }
+      // Exhausted all nodes without a conclusive result
+      return null;
+    } catch (error: any) {
       log.error({ err: error, topicId }, 'Failed to fetch unfulfilled worker nonces.');
       return null;
     }
@@ -919,39 +851,46 @@ class AlloraConnectorService {
       }
 
       // Get active topics at the current block height (only topics available for contribution)
-      const activeTopicsCommand = `allorad query emissions active-topics-at-block ${currentBlockHeight}`;
-      const [activeTopicsStdout, activeTopicsError] = await this.execAsyncWithRetry(activeTopicsCommand);
-
-      if (activeTopicsError) {
-        log.error({ err: activeTopicsError }, 'Failed to get active topics at current block height.');
-        return { topics: [] };
+      let formattedTopics: Array<{ id: string; metadata: string }> = [];
+      for (let i = 0; i < this.apiNodes.length; i++) {
+        try {
+          const apiUrl = this.getCurrentApiNode();
+          const res = await this.apiClient.get(`${apiUrl}/emissions/v9/active_topics_at_block/${currentBlockHeight}`);
+          const topics = res.data?.topics ?? [];
+          formattedTopics = topics.map((topic: any) => ({
+            id: String(topic.id ?? topic.topic_id),
+            metadata: String(topic.metadata ?? `Topic ${topic.id}`),
+          }));
+          log.info({ currentBlockHeight, activeTopicsCount: formattedTopics.length }, 'Successfully retrieved active topics available for contribution');
+          break;
+        } catch (e) {
+          this.switchToNextApiNode();
+        }
       }
-
-      // Parse the YAML output for active topics
-      try {
-        const activeTopicsData = yaml.load(activeTopicsStdout!) as any;
-        const topics = activeTopicsData.topics || [];
-
-        const formattedTopics = topics.map((topic: any) => ({
-          id: String(topic.id),
-          metadata: String(topic.metadata || `Topic ${topic.id}`)
-        }));
-
-        log.info({
-          currentBlockHeight,
-          activeTopicsCount: formattedTopics.length
-        }, 'Successfully retrieved active topics available for contribution');
-
         return { topics: formattedTopics };
-
-      } catch (parseError) {
-        log.error({ err: parseError, activeTopicsStdout }, 'Failed to parse active topics response.');
-        return { topics: [] };
-      }
 
     } catch (error: any) {
       log.error({ err: error }, 'Failed to get active topics');
       return { topics: [] };
+    }
+  }
+
+  public async performStartupHealthCheck(): Promise<void> {
+    logger.info('Performing startup health check for Allora API node...');
+    try {
+      const apiUrl = this.getCurrentApiNode();
+      await this.apiClient.get(`${apiUrl}/cosmos/base/tendermint/v1beta1/node_info`);
+      logger.info({ node: apiUrl }, 'Node is reachable.');
+
+      const syncResponse = await this.apiClient.get(`${apiUrl}/cosmos/base/tendermint/v1beta1/syncing`);
+      if (syncResponse.data?.syncing === true) {
+        logger.warn({ node: apiUrl }, 'WARNING: Node is still syncing. Data may be outdated.');
+      } else {
+        logger.info({ node: apiUrl }, 'Node is fully synced.');
+      }
+    } catch (error) {
+      logger.fatal({ err: error, node: this.getCurrentApiNode() }, 'CRITICAL: Could not connect to the initial Allora API node. Please check your ALLORA_API_URLS configuration.');
+      // Do not throw; allow app to continue and other nodes to be tried at runtime
     }
   }
 }

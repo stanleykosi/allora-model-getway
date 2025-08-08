@@ -11,7 +11,7 @@ Follow the setup instructions to get a local copy up and running.
 
 *   Node.js (v18 or higher recommended)
 *   Docker (for PostgreSQL and Redis)
-*   `allorad` CLI tool installed and in PATH. Follow instructions from the [official Allora documentation](https://docs.allora.network/devs/get-started/cli).
+*   All blockchain interactions are handled via API/RPC; the Allora CLI is no longer required for runtime.
 
 ### Installation
 

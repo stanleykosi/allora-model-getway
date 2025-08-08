@@ -143,14 +143,14 @@ const inferenceProcessor = async (job: Job<InferenceJobData>): Promise<void> => 
     log.info('Retrieved wallet mnemonic securely.');
 
     // 4.1 Gate by topic window and nonce before submitting
-    const topicInfo = await alloraConnectorService.getTopicInfo(String(topicId));
+    const topicDetails = await alloraConnectorService.getTopicDetails(String(topicId));
     const currentHeight = await alloraConnectorService.getCurrentBlockHeight();
-    if (!topicInfo || currentHeight == null) {
-      log.info({ topicInfo, currentHeight }, 'Skipping submission: missing topic info or current height');
+    if (!topicDetails || currentHeight == null || topicDetails.epochLastEnded == null || topicDetails.workerSubmissionWindow == null) {
+      log.info({ topicDetails, currentHeight }, 'Skipping submission: missing topic details or current height');
       return; // Skip this run; scheduler will try later
     }
-    const windowStart = topicInfo.epochLastEnded + 1;
-    const windowEnd = topicInfo.epochLastEnded + topicInfo.workerSubmissionWindow;
+    const windowStart = topicDetails.epochLastEnded + 1;
+    const windowEnd = topicDetails.epochLastEnded + topicDetails.workerSubmissionWindow;
     const inWindow = currentHeight >= windowStart && currentHeight <= windowEnd;
     log.info({ currentHeight, windowStart, windowEnd, inWindow }, 'Worker submission window check');
     if (!inWindow) {

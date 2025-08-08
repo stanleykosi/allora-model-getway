@@ -161,73 +161,17 @@ export const getModelPerformanceHandler = async (req: Request, res: Response) =>
 
 /**
  * @controller debugAlloradHandler
- * @description Debug endpoint to test allorad command execution.
+ * @description Replaced: Debug endpoint now uses connector service API calls instead of CLI.
  */
 export const debugAlloradHandler = async (req: Request, res: Response) => {
   const log = logger.child({ controller: 'debugAlloradHandler' });
-
   try {
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-
-    log.info('Testing allorad command execution...');
-
-    const isActiveCommand = 'allorad query emissions is-topic-active 1 --output json --node https://testnet.allora.network:26657';
-    const getTopicCommand = 'allorad query emissions topic 1 --node https://testnet.allora.network:26657';
-
-    const [isActiveResult, getTopicResult] = await Promise.all([
-      execAsync(isActiveCommand, {
-        env: {
-          ...process.env,
-          ALLORA_CHAIN_ID: 'allora-testnet-1',
-          ALLORA_RPC_URL: 'https://rpc.testnet.allora.network/'
-        }
-      }),
-      execAsync(getTopicCommand, {
-        env: {
-          ...process.env,
-          ALLORA_CHAIN_ID: 'allora-testnet-1',
-          ALLORA_RPC_URL: 'https://rpc.testnet.allora.network/'
-        }
-      })
-    ]);
-
-    // Test the parsing logic
-    const isActiveData = JSON.parse(isActiveResult.stdout);
-    const isActive = typeof isActiveData === 'boolean' ? isActiveData : isActiveData.active;
-
-    // Parse YAML using proper YAML parser
-    const topicData = yaml.load(getTopicResult.stdout) as any;
-    const topic = topicData.topic;
-    const topicId = topic?.id;
-    const epochLength = parseInt(topic?.epoch_length || '0', 10);
-    const creator = topic?.creator;
-
-    log.info({
-      isActiveStdout: isActiveResult.stdout,
-      isActiveStderr: isActiveResult.stderr,
-      getTopicStdout: getTopicResult.stdout,
-      getTopicStderr: getTopicResult.stderr,
-      parsed: { topicId, epochLength, creator, isActive }
-    }, 'Allorad command results with parsing');
-
-    return res.status(200).json({
-      success: true,
-      isActive: {
-        stdout: isActiveResult.stdout,
-        stderr: isActiveResult.stderr,
-        command: isActiveCommand
-      },
-      getTopic: {
-        stdout: getTopicResult.stdout,
-        stderr: getTopicResult.stderr,
-        command: getTopicCommand
-      },
-      parsed: { topicId, epochLength, creator, isActive }
-    });
+    const topicId = String(req.query.topic_id || '1');
+    const details = await (await import('@/core/allora-connector/allora-connector.service')).default.getTopicDetails(topicId);
+    const canFetch = details !== null;
+    return res.status(200).json({ success: true, canFetch, topicDetails: details });
   } catch (error: any) {
-    log.error({ err: error }, 'Debug allorad command failed');
+    log.error({ err: error }, 'Debug handler failed');
     return res.status(500).json({ error: error.message });
   }
 };

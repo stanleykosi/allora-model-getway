@@ -1,15 +1,13 @@
 /**
  * @description
- * This file contains the TypeScript type definitions and interfaces for the
- * data structures returned by the `allorad` CLI tool. Defining these types is
- * crucial for ensuring type safety when parsing JSON outputs from blockchain
- * queries and for providing a clear contract for the `AlloraConnectorService`.
+ * This file contains the TypeScript type definitions and interfaces for
+ * data structures returned by the Allora network APIs and services.
  */
 
 /**
  * @interface AlloraTopic
- * @description Models the structure of the JSON output from the
- * `allorad query emissions topic [topic_id]` command (v9).
+ * @description Models the structure of the API output for
+ * `GET /emissions/v9/topics/{topic_id}` (v9).
  */
 export interface AlloraTopic {
   topic_id: string;
@@ -29,7 +27,7 @@ export interface AlloraTopic {
 /**
  * @interface AlloraBalance
  * @description Models a single balance entry from the `balances` array returned by
- * the `allorad query bank balances [address]` command.
+ * `GET /cosmos/bank/v1beta1/balances/{address}`.
  */
 export interface AlloraBalance {
   denom: string;
@@ -61,6 +59,8 @@ export type ExecResult = [string | null, Error | null];
 export interface TopicDetails {
   id: string;
   epochLength: number;
+  workerSubmissionWindow?: number;
+  epochLastEnded?: number;
   isActive: boolean;
   creator: string;
   metadata: string;
@@ -68,8 +68,8 @@ export interface TopicDetails {
 
 /**
  * @interface AlloraEmaScore
- * @description Models the structure of the JSON output from the
- * `allorad query emissions inferer-score-ema` command (v9).
+ * @description Models the structure of the API output for
+ * `GET /emissions/v9/inferer_score_ema/{topicId}/{workerAddress}` (v9).
  */
 export interface AlloraEmaScore {
   score: string;
