@@ -35,14 +35,14 @@ connection.on('error', (err) => log.error({ err }, 'Redis connection error for B
 // This queue will handle all inference submission jobs.
 export const INFERENCE_QUEUE_NAME = 'inference-submission';
 export const inferenceQueue = new Queue<InferenceJobData>(INFERENCE_QUEUE_NAME, {
-    connection,
-    defaultJobOptions: {
-        attempts: 3, // Retry failed jobs up to 3 times
-        backoff: {
-            type: 'exponential',
-            delay: 5000, // Wait 5s before the first retry, then 10s, 20s
-        },
+  connection,
+  defaultJobOptions: {
+    attempts: 3, // Retry failed jobs up to 3 times
+    backoff: {
+      type: 'exponential',
+      delay: 5000, // Wait 5s before the first retry, then 10s, 20s
     },
+  },
 });
 
 log.info(`Job queue "${INFERENCE_QUEUE_NAME}" initialized.`);
@@ -53,10 +53,10 @@ log.info(`Job queue "${INFERENCE_QUEUE_NAME}" initialized.`);
 // You can run multiple worker processes to scale up processing capacity.
 const worker = new Worker<InferenceJobData>(INFERENCE_QUEUE_NAME, inferenceProcessor, {
   connection,
-  concurrency: 5, // Process up to 5 jobs concurrently
-  limiter: {      // Optional: Rate limit jobs (e.g., 100 jobs every 10 seconds)
-    max: 100,
-    duration: 10000,
+  concurrency: config.JOB_CONCURRENCY,
+  limiter: {
+    max: config.JOB_RATE_MAX,
+    duration: config.JOB_RATE_DURATION,
   },
 });
 
@@ -70,7 +70,7 @@ worker.on('failed', (job, err) => {
 });
 
 worker.on('error', err => {
-    log.error({ err }, 'A BullMQ worker experienced a critical error.');
+  log.error({ err }, 'A BullMQ worker experienced a critical error.');
 });
 
 log.info(`Job worker for "${INFERENCE_QUEUE_NAME}" is running.`);

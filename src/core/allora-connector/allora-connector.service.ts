@@ -52,12 +52,15 @@ import {
   InsertWorkerPayloadRequest
 } from '@/generated/allora_worker';
 import { processChainError, ChainErrorAction } from './chain-error.handler';
+import { nodeSwitches, outOfGasRetries } from '@/metrics/metrics';
+import { RegisterRequest as V9RegisterRequest } from '@/generated/emissions/v9/register';
 
 // Removed CLI execution; all queries use API and transactions use RPC
 
 // Define the type URLs for our custom messages. These must match the definitions on the Allora chain.
 // For ADR-031 style Msg service, the type URL is the fully-qualified request message name
 const msgInsertWorkerPayloadTypeUrl = "/emissions.v9.InsertWorkerPayloadRequest";
+const msgRegisterTypeUrl = "/emissions.v9.RegisterRequest";
 
 class AlloraConnectorService {
   private readonly MAX_RETRIES = 3;
@@ -83,6 +86,10 @@ class AlloraConnectorService {
   private cachedMinGasFetchedAt = 0;
   private readonly MIN_GAS_PRICE_CACHE_MS = 60_000; // 60s
 
+  // Cached active topics
+  private cachedActiveTopics: { topics: Array<{ id: string; metadata: string }> } | null = null;
+  private cachedActiveTopicsFetchedAt = 0;
+
   constructor() {
     // Create a new Registry instance, including all default Cosmos SDK message types
     const registry = new Registry();
@@ -93,6 +100,8 @@ class AlloraConnectorService {
 
     // Register v9 InsertWorkerPayloadRequest using generated encoder/decoder
     registry.register(msgInsertWorkerPayloadTypeUrl, InsertWorkerPayloadRequest as any);
+    // Register v9 RegisterRequest (minimal local definition)
+    registry.register(msgRegisterTypeUrl, V9RegisterRequest as any);
 
     this.registry = registry;
 
@@ -113,7 +122,7 @@ class AlloraConnectorService {
   }
 
 
-  // Removed CLI execution helper; retained for history in git
+
 
   // Node management helpers
   private getCurrentApiNode = (): string => this.apiNodes[this.currentApiNodeIndex];
@@ -135,6 +144,20 @@ class AlloraConnectorService {
     logger.warn({ newNode }, 'Switched to next Allora RPC node due to a failure.');
     return newNode;
   };
+
+  // Simple RPC node health tracking
+  private rpcNodeFailures: Record<string, number> = {};
+  private async checkRpcHealth(nodeUrl: string): Promise<boolean> {
+    try {
+      // Light-weight ABCI query via Stargate QueryClient would be ideal; use axios head as a placeholder
+      await axios.get(nodeUrl, { timeout: 3000 });
+      this.rpcNodeFailures[nodeUrl] = 0;
+      return true;
+    } catch (_e) {
+      this.rpcNodeFailures[nodeUrl] = (this.rpcNodeFailures[nodeUrl] || 0) + 1;
+      return false;
+    }
+  }
 
   private async getEffectiveGasPrice(fallbackGasPrice: string): Promise<GasPrice> {
     const parse = (s: string) => {
@@ -399,7 +422,10 @@ class AlloraConnectorService {
         }
         const decision = processChainError(error);
         if (decision.action === ChainErrorAction.Fail) return null;
-        if (decision.action === ChainErrorAction.SwitchNode) this.switchToNextRpcNode();
+        if (decision.action === ChainErrorAction.SwitchNode) {
+          try { nodeSwitches.inc({ type: 'transferFunds' }); } catch (_e) { }
+          this.switchToNextRpcNode();
+        }
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2;
       }
@@ -442,30 +468,58 @@ class AlloraConnectorService {
   /**
    * Get active inferers for a topic
    */
-  public async getActiveInferers(topicId: string): Promise<any> {
+  public async getActiveInferers(topicId: string): Promise<string[]> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'getActiveInferers', topicId });
 
     try {
       log.info('Fetching active inferers from Allora network');
 
-      let activeInferers: any = {};
+      let payload: any = null;
       for (let i = 0; i < this.apiNodes.length; i++) {
         try {
           const apiUrl = this.getCurrentApiNode();
           const res = await this.apiClient.get(`${apiUrl}/emissions/v9/active_inferers/${topicId}`);
-          activeInferers = res.data;
+          payload = res.data;
           break;
         } catch (e) {
           this.switchToNextApiNode();
         }
       }
 
-      log.info('Successfully retrieved active inferers');
-      return activeInferers;
+      // Normalize to an array of addresses
+      const addresses: string[] = [];
+      if (Array.isArray(payload)) {
+        for (const entry of payload) {
+          if (typeof entry === 'string') addresses.push(entry);
+          else if (entry && typeof entry === 'object') {
+            const addr = entry.address || entry.inferer || entry.worker || entry.wallet;
+            if (typeof addr === 'string') addresses.push(addr);
+          }
+        }
+      } else if (payload && typeof payload === 'object') {
+        // If payload is a map/object, prefer values then keys
+        const vals = Object.values(payload as Record<string, any>);
+        if (vals.length && typeof vals[0] === 'string') {
+          for (const v of vals) if (typeof v === 'string') addresses.push(v);
+        } else {
+          for (const [k, v] of Object.entries(payload as Record<string, any>)) {
+            if (v && typeof v === 'object') {
+              const addr = v.address || v.inferer || v.worker || v.wallet;
+              if (typeof addr === 'string') addresses.push(addr);
+              else if (typeof k === 'string') addresses.push(k);
+            } else if (typeof k === 'string') {
+              addresses.push(k);
+            }
+          }
+        }
+      }
+
+      log.info({ count: addresses.length }, 'Successfully retrieved active inferers');
+      return addresses;
 
     } catch (error: any) {
       log.error({ err: error }, 'Failed to get active inferers');
-      return {};
+      return [];
     }
   }
 
@@ -595,10 +649,14 @@ class AlloraConnectorService {
     topicId: string,
     workerResponse: WorkerResponsePayload,
     gasPrice: string,
-    nonceHeight?: number
+    nonceHeight?: number,
+    options?: { fastBroadcast?: boolean; fixedGasLimit?: number }
   ): Promise<{ txHash: string } | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'submitWorkerPayload', topicId });
     let delay = this.INITIAL_DELAY_MS;
+    // Adaptive gas handling
+    let safetyMultiplier = 1.35;
+    let nextGasOverride: number | null = null;
 
     let senderAddress: string = 'unknown';
     for (let i = 0; i < this.MAX_RETRIES; i++) {
@@ -700,7 +758,8 @@ class AlloraConnectorService {
         // Sign the hash
         const signature = await Secp256k1.createSignature(messageHash, privateKey);
         const fixedSignature = new Uint8Array([...signature.r(32), ...signature.s(32)]);
-        const pubKey = (await Secp256k1.makeKeypair(privateKey)).pubkey;
+        const uncompressedPubKey = (await Secp256k1.makeKeypair(privateKey)).pubkey;
+        const compressedPubKey = Secp256k1.compressPubkey(uncompressedPubKey);
 
         // Create the final worker data bundle
         const workerDataBundle: InputWorkerDataBundle = {
@@ -709,7 +768,7 @@ class AlloraConnectorService {
           topicId: Number(topicId), // Convert to uint64 as per protocol
           inferenceForecastsBundle: bundle,
           inferencesForecastsBundleSignature: Buffer.from(fixedSignature),
-          pubkey: Buffer.from(pubKey).toString('hex'),
+          pubkey: Buffer.from(compressedPubKey).toString('hex'),
         };
 
         // Validate the bundle before submission
@@ -727,17 +786,30 @@ class AlloraConnectorService {
           }),
         };
 
-        // Simulate via API to estimate gas, then compute dynamic fee
+        // Choose gas strategy: fast broadcast (skip simulate) or simulate
         let gasLimit = parseInt(this.INFERENCE_GAS_LIMIT, 10);
-        try {
-          const apiUrl = this.getCurrentApiNode();
-          // Sign with dummy fee to get tx bytes
-          const accountInfo = await client.getSequence(senderAddress);
-          const anyMsgs = [message as any];
-          const simulated = await client.simulate(senderAddress, anyMsgs, undefined);
-          gasLimit = Math.ceil(Number(simulated) * 1.2);
-        } catch (e) {
-          log.warn({ err: e }, 'Simulation failed; falling back to default gas limit');
+        if (options?.fastBroadcast) {
+          gasLimit = options.fixedGasLimit && Number.isFinite(options.fixedGasLimit)
+            ? Math.max(1, Math.floor(options.fixedGasLimit))
+            : config.SUBMISSION_FIXED_GAS_LIMIT;
+          if (nextGasOverride && nextGasOverride > gasLimit) {
+            gasLimit = nextGasOverride;
+          }
+        } else {
+          try {
+            const anyMsgs = [message as any];
+            const simulated = await client.simulate(senderAddress, anyMsgs, undefined);
+            gasLimit = Math.ceil(Number(simulated) * safetyMultiplier);
+            if (nextGasOverride && nextGasOverride > gasLimit) {
+              gasLimit = nextGasOverride;
+            }
+          } catch (e) {
+            log.warn({ err: e }, 'Simulation failed; falling back to default gas limit');
+            if (nextGasOverride) {
+              gasLimit = nextGasOverride;
+              log.warn({ nextGasOverride }, 'Applying parsed gas override after previous out-of-gas');
+            }
+          }
         }
 
         const fee = calculateFee(gasLimit, await this.getEffectiveGasPrice(gasPrice));
@@ -759,9 +831,27 @@ class AlloraConnectorService {
 
       } catch (error) {
         log.warn({ err: error, attempt: i + 1, signingAddress: senderAddress || 'unknown' }, 'Submission attempt failed');
+        // If out-of-gas, adapt gas for next attempt
+        const msg = String((error as any)?.message || '');
+        if (/out of gas/i.test(msg)) {
+          try { outOfGasRetries.inc({ context: 'submitWorkerPayload' }); } catch (_e) { }
+          const usedMatch = msg.match(/gas\s*used[:=]?\s*'?([0-9]+)/i) || msg.match(/gasUsed:\s*(\d+)/i);
+          if (usedMatch && usedMatch[1]) {
+            const used = parseInt(usedMatch[1], 10);
+            if (!Number.isNaN(used)) {
+              nextGasOverride = Math.ceil(used * 1.4);
+              safetyMultiplier = Math.min(Math.max(safetyMultiplier + 0.15, 1.4), 2.0);
+              log.warn({ used, nextGasOverride, safetyMultiplier }, 'Adjusting gas after out-of-gas');
+            }
+          } else {
+            safetyMultiplier = Math.min(Math.max(safetyMultiplier + 0.15, 1.4), 2.0);
+            log.warn({ safetyMultiplier }, 'Bumping gas multiplier due to out-of-gas');
+          }
+        }
         const decision = processChainError(error);
         if (decision.action === ChainErrorAction.Fail) return null;
         if (decision.action === ChainErrorAction.SwitchNode) {
+          try { nodeSwitches.inc({ type: 'submitWorkerPayload' }); } catch (_e) { }
           this.switchToNextRpcNode();
           this.switchToNextApiNode();
         }
@@ -773,8 +863,8 @@ class AlloraConnectorService {
   }
 
   /**
-   * Get the current block height using CLI text/YAML output.
-   * Tries `--type=height` first, falls back to generic output parsing.
+   * Get the current block height using API URL.
+   * Tries all API nodes in sequence.
    */
   public async getCurrentBlockHeight(): Promise<number | null> {
     const log = logger.child({ service: 'AlloraConnectorService', method: 'getCurrentBlockHeight' });
@@ -818,8 +908,8 @@ class AlloraConnectorService {
         this.switchToNextApiNode();
       }
     }
-    log.warn('canSubmitWorker failed on all nodes; defaulting to true');
-    return true;
+    log.warn('canSubmitWorker failed on all nodes; defaulting to false');
+    return false;
   }
 
   /**
@@ -835,7 +925,6 @@ class AlloraConnectorService {
           const response = await this.apiClient.get(apiUrl);
           // The response structure is nested, so we access it safely.
           const nonces = response.data?.nonces?.nonces;
-          return null;
           if (!nonces || !Array.isArray(nonces) || nonces.length === 0) {
             log.info({ topicId }, 'No unfulfilled worker nonces found for topic.');
             return null;
@@ -878,6 +967,12 @@ class AlloraConnectorService {
     try {
       log.info('Fetching active topics from Allora network');
 
+      // Serve from cache if fresh
+      const now = Date.now();
+      if (this.cachedActiveTopics && now - this.cachedActiveTopicsFetchedAt < config.ACTIVE_TOPICS_CACHE_MS) {
+        return this.cachedActiveTopics;
+      }
+
       const currentBlockHeight = await this.getCurrentBlockHeight();
       if (currentBlockHeight == null) {
         return { topics: [] };
@@ -902,7 +997,7 @@ class AlloraConnectorService {
       }
 
       // Fallback: if empty, scan known topic IDs for is_active to populate discovery list
-      if (formattedTopics.length === 0) {
+      if (formattedTopics.length === 0 && config.ACTIVE_TOPICS_FALLBACK_SCAN) {
         const startId = config.ACTIVE_TOPICS_SCAN_START_ID;
         const endId = config.ACTIVE_TOPICS_SCAN_END_ID;
         const discovered: Array<{ id: string; metadata: string }> = [];
@@ -925,7 +1020,10 @@ class AlloraConnectorService {
         }
       }
 
-      return { topics: formattedTopics };
+      const payload = { topics: formattedTopics };
+      this.cachedActiveTopics = payload;
+      this.cachedActiveTopicsFetchedAt = Date.now();
+      return payload;
 
     } catch (error: any) {
       log.error({ err: error }, 'Failed to get active topics');
@@ -950,6 +1048,91 @@ class AlloraConnectorService {
       logger.fatal({ err: error, node: this.getCurrentApiNode() }, 'CRITICAL: Could not connect to the initial Allora API node. Please check your ALLORA_API_URLS configuration.');
       // Do not throw; allow app to continue and other nodes to be tried at runtime
     }
+  }
+
+  /**
+   * Register worker wallet on-chain for a topic.
+   */
+  public async registerWorkerOnChain(signingMnemonic: string, topicId: string): Promise<{ txHash: string } | null> {
+    const log = logger.child({ service: 'AlloraConnectorService', method: 'registerWorkerOnChain', topicId });
+    let delay = this.INITIAL_DELAY_MS;
+    let safetyMultiplier = 1.35;
+    let nextGasOverride: number | null = null;
+    for (let i = 0; i < this.MAX_RETRIES; i++) {
+      try {
+        const wallet = await DirectSecp256k1HdWallet.fromMnemonic(signingMnemonic, { prefix: 'allo' });
+        const [account] = await wallet.getAccounts();
+        const senderAddress = account.address;
+        const client = await SigningStargateClient.connectWithSigner(this.getCurrentRpcNode(), wallet, {
+          registry: this.registry,
+          gasPrice: await this.getEffectiveGasPrice(this.TREASURY_GAS_PRICE),
+        });
+
+        const msg: EncodeObject = {
+          typeUrl: msgRegisterTypeUrl,
+          value: V9RegisterRequest.fromPartial({
+            sender: senderAddress,
+            topicId: Number(topicId),
+            owner: senderAddress,
+            isReputer: false,
+          }),
+        } as any;
+
+        // simulate for gas
+        let gasLimit = parseInt(this.UNIVERSAL_GAS_LIMIT, 10);
+        try {
+          const simulated = await client.simulate(senderAddress, [msg], undefined);
+          const simulatedGas = Number(simulated);
+          gasLimit = Math.ceil(simulatedGas * safetyMultiplier);
+          if (nextGasOverride && nextGasOverride > gasLimit) {
+            gasLimit = nextGasOverride;
+          }
+        } catch (e) {
+          log.warn({ err: e }, 'Simulation failed; using default gas limit for registration');
+          if (nextGasOverride) {
+            gasLimit = nextGasOverride;
+            log.warn({ nextGasOverride }, 'Applying parsed gas override after previous out-of-gas');
+          }
+        }
+
+        const fee = calculateFee(gasLimit, await this.getEffectiveGasPrice(this.TREASURY_GAS_PRICE));
+        const result = await client.signAndBroadcast(senderAddress, [msg], fee, `Register worker for topic ${topicId}`);
+        if (isDeliverTxFailure(result)) {
+          throw new Error(`Registration failed: ${result.rawLog}`);
+        }
+        log.info({ txHash: result.transactionHash }, 'Worker registration successful');
+        return { txHash: result.transactionHash };
+      } catch (error) {
+        log.warn({ err: error, attempt: i + 1 }, 'Worker registration failed on attempt');
+        const msgText = String((error as any)?.message || '');
+        if (/already registered/i.test(msgText)) {
+          log.info({ topicId }, 'Worker already registered on topic; proceeding.');
+          return { txHash: 'ALREADY_REGISTERED' };
+        }
+        const msg = String((error as any)?.message || '');
+        if (/out of gas/i.test(msg)) {
+          try { outOfGasRetries.inc({ context: 'registerWorkerOnChain' }); } catch (_e) { }
+          const usedMatch = msg.match(/gasUsed:\s*(\d+)/i);
+          if (usedMatch && usedMatch[1]) {
+            const used = parseInt(usedMatch[1], 10);
+            if (!Number.isNaN(used)) {
+              nextGasOverride = Math.ceil(used * 1.4);
+              safetyMultiplier = Math.min(Math.max(safetyMultiplier + 0.15, 1.4), 2.0);
+              log.warn({ used, nextGasOverride, safetyMultiplier }, 'Adjusting gas after out-of-gas');
+            }
+          } else {
+            safetyMultiplier = Math.min(Math.max(safetyMultiplier + 0.15, 1.4), 2.0);
+            log.warn({ safetyMultiplier }, 'Bumping gas multiplier due to out-of-gas');
+          }
+        }
+        const decision = processChainError(error);
+        if (decision.action === ChainErrorAction.Fail) return null;
+        if (decision.action === ChainErrorAction.SwitchNode) this.switchToNextRpcNode();
+        await new Promise((r) => setTimeout(r, delay));
+        delay *= 2;
+      }
+    }
+    return null;
   }
 }
 

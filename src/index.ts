@@ -23,6 +23,7 @@ import inferenceScheduler from './core/scheduler/inference.scheduler';
 import performanceScheduler from './core/scheduler/performance.scheduler';
 import secretsService from './core/secrets/secrets.service';
 import alloraConnectorService from './core/allora-connector/allora-connector.service';
+import axios from 'axios';
 
 const PORT = config.PORT;
 
@@ -86,6 +87,19 @@ const startServer = async () => {
       inferenceScheduler.start();
       // Start the performance monitoring scheduler.
       performanceScheduler.start();
+
+      // Optional: periodic node health checks (best-effort)
+      if (config.ENABLE_NODE_HEALTH_MONITOR) {
+        const interval = setInterval(async () => {
+          try {
+            await alloraConnectorService.performStartupHealthCheck?.();
+          } catch (e) {
+            logger.warn({ err: e }, 'Periodic node health check reported a warning');
+          }
+        }, config.NODE_HEALTH_CHECK_MS);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (interval as any).unref?.();
+      }
     });
   } catch (error) {
     logger.fatal({ err: error }, '❌ Failed to start the server');

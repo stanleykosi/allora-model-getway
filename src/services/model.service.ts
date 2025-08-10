@@ -43,6 +43,7 @@ export interface ModelRegistrationData {
 export interface RegistrationResult {
   modelId: string;
   walletAddress: string;
+  registrationTxHash?: string;
   costsIncurred: {
     registrationFee: string;
     initialFunding: string;
@@ -101,6 +102,23 @@ class ModelService {
     }
     log.info({ walletAddress: newWallet.address }, 'Wallet funded successfully.');
 
+    // Step 3.5: Register the wallet on-chain for the topic
+    try {
+      const mnemonic = await secretsService.getSecret(newWallet.secretRef);
+      if (!mnemonic) {
+        throw new Error('Mnemonic not found for new wallet');
+      }
+      const reg = await alloraConnectorService.registerWorkerOnChain(mnemonic, data.topicId);
+      if (!reg) {
+        throw new Error('On-chain registration failed');
+      }
+      log.info({ txHash: reg.txHash }, 'On-chain registration complete');
+    } catch (e) {
+      log.error({ err: e }, 'Registration failed; cleaning up wallet');
+      await this.cleanupFailedRegistration(newWallet);
+      throw e;
+    }
+
     // Step 4: Persist the model's metadata to the database.
     try {
       const modelQuery = `
@@ -133,6 +151,7 @@ class ModelService {
       return {
         modelId: newModelId,
         walletAddress: newWallet.address,
+        registrationTxHash: undefined,
         costsIncurred: {
           registrationFee: `${REGISTRATION_FEE}uallo`,
           initialFunding: `${INITIAL_FUNDING}uallo`,

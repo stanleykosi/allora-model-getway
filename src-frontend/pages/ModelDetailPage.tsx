@@ -58,6 +58,30 @@ export default function ModelDetailPage() {
     retry: false, // Don't retry on failure - if it fails once, likely invalid model ID
   });
 
+  // Recent submissions (lightweight audit trail)
+  type Submission = {
+    id: string;
+    topic_id: string;
+    nonce_height: number | null;
+    tx_hash: string | null;
+    status: 'success' | 'failed' | string;
+    created_at: string;
+    raw_log?: string | null;
+  };
+
+  const fetchSubmissions = async (modelId: string): Promise<Submission[]> => {
+    const { data } = await api.get(`/api/v1/submissions`, {
+      params: { modelId, limit: 10 },
+    });
+    return data?.submissions || [];
+  };
+
+  const { data: submissions = [], isLoading: isLoadingSubs } = useQuery({
+    queryKey: ['modelSubmissions', modelId],
+    queryFn: () => fetchSubmissions(modelId),
+    enabled: !!modelId,
+  });
+
   const chartData = data?.performance_metrics.map(d => ({
     ...d,
     timestamp: new Date(d.timestamp).toLocaleDateString(),
@@ -282,6 +306,57 @@ export default function ModelDetailPage() {
               <p className="text-text-secondary max-w-md">
                 This model hasn't participated in any predictions yet. Check back after the next epoch for performance data.
               </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent Submissions (last 10) */}
+      <Card className="mt-6 border-0 shadow-xl bg-surface/50 backdrop-blur-sm">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-primary/20 to-accent/20 rounded-md flex items-center justify-center">
+              <BarChart3 className="h-4 w-4 text-primary" />
+            </div>
+            <CardTitle className="text-lg font-semibold">Recent Submissions</CardTitle>
+          </div>
+          <CardDescription className="text-sm text-text-secondary">Last 10 attempts for this model</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingSubs ? (
+            <div className="flex items-center gap-2 text-text-secondary"><LoadingSpinner size={16} /> Loading submissions…</div>
+          ) : submissions.length === 0 ? (
+            <div className="text-sm text-text-secondary">No submissions yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-text-secondary">
+                    <th className="py-2 pr-4">Time</th>
+                    <th className="py-2 pr-4">Topic</th>
+                    <th className="py-2 pr-4">Nonce</th>
+                    <th className="py-2 pr-4">Status</th>
+                    <th className="py-2 pr-4">Tx Hash</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {submissions.map((s) => (
+                    <tr key={s.id} className="border-t border-border/50">
+                      <td className="py-2 pr-4">{new Date(s.created_at).toLocaleString()}</td>
+                      <td className="py-2 pr-4 font-mono">{s.topic_id}</td>
+                      <td className="py-2 pr-4">{s.nonce_height ?? '-'}</td>
+                      <td className="py-2 pr-4">
+                        <span className={`px-2 py-0.5 rounded text-xs ${s.status === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4 font-mono truncate max-w-[200px]" title={s.tx_hash || ''}>
+                        {s.tx_hash ? s.tx_hash.slice(0, 10) + '…' : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>

@@ -29,6 +29,8 @@ import securityMonitoring from '@/api/v1/middleware/security.middleware';
 import modelRoutes from '@/api/v1/models/models.routes';
 import userRoutes from '@/api/v1/users/users.routes';
 import predictionRoutes from '@/api/v1/predictions/predictions.routes';
+import submissionsRoutes from '@/api/v1/submissions/submissions.routes';
+import { register as metricsRegistry } from '@/metrics/metrics';
 
 // Create the Express application instance.
 const app: Express = express();
@@ -213,6 +215,23 @@ app.use('/api/v1/users', authLimiter, userRoutes);
 
 // Wire up the versioned API routes for the 'predictions' resource.
 app.use('/api/v1/predictions', predictionRoutes);
+
+// Wire up submissions routes for auditing submissions
+app.use('/api/v1/submissions', submissionsRoutes);
+
+// Metrics endpoint (optional token protection)
+app.get('/metrics', async (req, res) => {
+  const token = config.METRICS_TOKEN;
+  if (token) {
+    const auth = req.get('authorization') || '';
+    const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (provided !== token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
+  res.set('Content-Type', metricsRegistry.contentType);
+  res.send(await metricsRegistry.metrics());
+});
 
 // --- Frontend Static Files ---
 // Serve static files from the frontend build directory using absolute project root path. This works

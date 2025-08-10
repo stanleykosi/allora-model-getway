@@ -87,6 +87,32 @@ const envSchema = z.object({
   ACTIVE_TOPICS_SCAN_START_ID: z.coerce.number().int().positive().default(1),
   ACTIVE_TOPICS_SCAN_END_ID: z.coerce.number().int().positive().default(100),
   ACTIVE_TOPICS_CACHE_MS: z.coerce.number().int().positive().default(60000),
+  ACTIVE_TOPICS_FALLBACK_SCAN: z.coerce.boolean().default(true),
+
+  // Fast broadcast configuration
+  SUBMISSION_FIXED_GAS_LIMIT: z.coerce.number().int().positive().default(180000),
+  JOBS_FAST_BROADCAST: z.coerce.boolean().default(false),
+
+  // Submission gating configuration
+  JOBS_BYPASS_CAN_SUBMIT: z.coerce.boolean().default(false),
+
+  // Node health monitoring
+  ENABLE_NODE_HEALTH_MONITOR: z.coerce.boolean().default(true),
+  NODE_HEALTH_CHECK_MS: z.coerce.number().int().positive().default(30000),
+  NODE_HEALTH_MAX_FAILS: z.coerce.number().int().positive().default(2),
+
+  // Job queue controls
+  JOB_CONCURRENCY: z.coerce.number().int().positive().default(5),
+  JOB_RATE_MAX: z.coerce.number().int().positive().default(100),
+  JOB_RATE_DURATION: z.coerce.number().int().positive().default(10000),
+
+  // Preflight balance and auto-top-up
+  ENABLE_PREFLIGHT_BALANCE_CHECK: z.coerce.boolean().default(true),
+  MIN_WALLET_BALANCE_UALLO: z.coerce.number().int().nonnegative().default(20000),
+  TOPUP_AMOUNT_UALLO: z.coerce.number().int().positive().default(50000),
+
+  // Metrics protection
+  METRICS_TOKEN: z.string().optional(),
 });
 
 /**
