@@ -93,7 +93,18 @@ class ModelService {
 
     // Step 3: Fund the newly created wallet from the central treasury.
     // This is a critical step that involves multiple failure points.
-    const fundingSuccessful = await this.fundNewWallet(newWallet);
+    // 3.1 Simulate registration to estimate fee, then apply multiplier
+    // Try 1) chain param registration_fee; 2) simulate; 3) conservative fallback
+    let baseFeeUallo: number | null = await alloraConnectorService.getRegistrationFeeUallo();
+    if (baseFeeUallo == null) {
+      baseFeeUallo = await this.simulateRegistrationFeeUallo(newWallet);
+    }
+    if (baseFeeUallo == null || !Number.isFinite(baseFeeUallo)) {
+      baseFeeUallo = 2_000_000;
+    }
+    const fundingTargetUallo = Math.ceil(baseFeeUallo * config.REG_FEE_SAFETY_MULTIPLIER);
+    // 3.2 Fund wallet up to the computed target
+    const fundingSuccessful = await this.fundNewWallet(newWallet, fundingTargetUallo);
     if (!fundingSuccessful) {
       log.error({ walletId: newWallet.id }, 'Registration failed: Funding transaction failed. Rolling back wallet creation.');
       // If funding fails, we must clean up the wallet and its secret.
@@ -103,6 +114,7 @@ class ModelService {
     log.info({ walletAddress: newWallet.address }, 'Wallet funded successfully.');
 
     // Step 3.5: Register the wallet on-chain for the topic
+    let registrationTxHash: string | undefined;
     try {
       const mnemonic = await secretsService.getSecret(newWallet.secretRef);
       if (!mnemonic) {
@@ -113,6 +125,7 @@ class ModelService {
         throw new Error('On-chain registration failed');
       }
       log.info({ txHash: reg.txHash }, 'On-chain registration complete');
+      registrationTxHash = reg.txHash;
     } catch (e) {
       log.error({ err: e }, 'Registration failed; cleaning up wallet');
       await this.cleanupFailedRegistration(newWallet);
@@ -122,8 +135,8 @@ class ModelService {
     // Step 4: Persist the model's metadata to the database.
     try {
       const modelQuery = `
-        INSERT INTO models (user_id, wallet_id, webhook_url, topic_id, is_inferer, is_forecaster, max_gas_price)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO models (user_id, wallet_id, webhook_url, topic_id, is_inferer, is_forecaster, max_gas_price, registration_fee_uallo)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id;
       `;
       const modelValues = [
@@ -134,6 +147,8 @@ class ModelService {
         data.isInferer,
         data.isForecaster,
         data.maxGasPrice,
+        // Persist the actual funding amount used: (param or simulated) × safety multiplier
+        fundingTargetUallo,
       ];
       const result = await pool.query<{ id: string }>(modelQuery, modelValues);
       const newModelId = result.rows[0]?.id;
@@ -151,7 +166,7 @@ class ModelService {
       return {
         modelId: newModelId,
         walletAddress: newWallet.address,
-        registrationTxHash: undefined,
+        registrationTxHash,
         costsIncurred: {
           registrationFee: `${REGISTRATION_FEE}uallo`,
           initialFunding: `${INITIAL_FUNDING}uallo`,
@@ -170,7 +185,7 @@ class ModelService {
    * @param newWallet The wallet to be funded.
    * @returns True if funding was successful, false otherwise.
    */
-  private async fundNewWallet(newWallet: CreatedWallet): Promise<boolean> {
+  private async fundNewWallet(newWallet: CreatedWallet, targetUallo: number): Promise<boolean> {
     const treasuryMnemonic = await secretsService.getSecret(config.TREASURY_MNEMONIC_SECRET_KEY);
     if (!treasuryMnemonic) {
       logger.fatal('CRITICAL: Treasury wallet mnemonic is not available in secrets manager.');
@@ -178,7 +193,19 @@ class ModelService {
       return false;
     }
 
-    const amountToSend = `${TOTAL_FUNDING}uallo`;
+    // Derive delta to reach target
+    const totalTarget = Math.max(0, Math.ceil(targetUallo));
+
+    // Check current balance and only top up the delta
+    const currentBalance = await alloraConnectorService.getAccountBalance(newWallet.address);
+    const current = typeof currentBalance === 'number' && Number.isFinite(currentBalance) ? currentBalance : 0;
+    const delta = Math.max(0, totalTarget - current);
+    if (delta === 0) {
+      logger.info({ address: newWallet.address, current }, 'Wallet already meets or exceeds target funding; skipping treasury transfer.');
+      return true;
+    }
+
+    const amountToSend = `${delta}uallo`;
     const transferResult = await alloraConnectorService.transferFunds(
       treasuryMnemonic,
       newWallet.address,
@@ -186,6 +213,48 @@ class ModelService {
     );
 
     return transferResult !== null;
+  }
+
+  /**
+   * Simulate the on-chain registration to estimate the fee in uallo for funding.
+   * Falls back to a sane constant if simulation somehow fails repeatedly.
+   */
+  private async simulateRegistrationFeeUallo(newWallet: CreatedWallet): Promise<number> {
+    try {
+      const mnemonic = await secretsService.getSecret(newWallet.secretRef);
+      if (!mnemonic) return 2_000_000; // conservative fallback
+
+      const wallet = await alloraConnectorService;
+      // We cannot directly get gasUsed via public helper, so we approximate by performing
+      // a local simulation flow similar to registerWorkerOnChain but without broadcasting.
+      const rpc = (alloraConnectorService as any).getCurrentRpcNode?.() || '';
+      // Recreate signer
+      const signer = await (await import('@cosmjs/proto-signing')).DirectSecp256k1HdWallet.fromMnemonic(mnemonic, { prefix: 'allo' });
+      const [account] = await signer.getAccounts();
+      const { SigningStargateClient, GasPrice, calculateFee } = await import('@cosmjs/stargate');
+      // Gas price: use connector's effective gas price for treasury gas price baseline
+      const gasPrice = await (alloraConnectorService as any).getEffectiveGasPrice?.('10uallo');
+      const client = await SigningStargateClient.connectWithSigner(rpc, signer, { gasPrice });
+
+      // Build a minimal RegisterRequest message
+      const { RegisterRequest: V9RegisterRequest } = await import('@/generated/emissions/v9/register');
+      const msg = {
+        typeUrl: '/emissions.v9.RegisterRequest',
+        value: V9RegisterRequest.fromPartial({ sender: account.address, topicId: 1 as any, owner: account.address, isReputer: false }),
+      } as any;
+
+      // Simulate with a placeholder topicId (gas roughly invariant w.r.t id)
+      const simulated = await client.simulate(account.address, [msg], undefined);
+      const gasUsed = Number(simulated);
+      const fee = calculateFee(Math.ceil(gasUsed * 1.0), gasPrice);
+      // fee.amount is array of coins; take first denom uallo
+      const amount = Array.isArray((fee as any).amount) && (fee as any).amount[0]?.amount
+        ? Number((fee as any).amount[0].amount)
+        : 2_000_000;
+      return amount;
+    } catch (_e) {
+      return 2_000_000; // conservative fallback
+    }
   }
 
   /**

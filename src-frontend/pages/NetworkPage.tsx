@@ -94,6 +94,29 @@ export default function NetworkPage() {
     queryFn: fetchActiveTopics,
   });
 
+  // Prefetch topic summaries (epochLength, isActive) for list rendering
+  const topicIds = (topicsData?.topics || []).map((t: any) => String(t.id));
+  const { data: topicsSummary } = useQuery({
+    queryKey: ['activeTopicsSummary', topicIds],
+    enabled: Array.isArray(topicIds) && topicIds.length > 0,
+    queryFn: async () => {
+      const results = await Promise.allSettled(
+        topicIds.map((id: string) => fetchTopicDetails(id))
+      );
+      const map: Record<string, { epochLength?: number; isActive?: boolean }> = {};
+      results.forEach((res, idx) => {
+        const id = topicIds[idx];
+        if (res.status === 'fulfilled' && res.value?.topic) {
+          map[id] = {
+            epochLength: res.value.topic.epochLength,
+            isActive: !!res.value.topic.isActive,
+          };
+        }
+      });
+      return map;
+    },
+  });
+
   const { data: topicDetails, isLoading: isLoadingTopicDetails } = useQuery({
     queryKey: ['topicDetails', selectedTopicId],
     queryFn: () => fetchTopicDetails(selectedTopicId!),
@@ -292,7 +315,7 @@ export default function NetworkPage() {
                           <div className="flex-1">
                             <h4 className="font-semibold text-text-primary">{topic.metadata}</h4>
                             <p className="text-xs text-text-secondary">
-                              {topic.epochLength || 0} blocks • {topic.isActive ? 'Active' : 'Inactive'}
+                              {topicsSummary?.[String(topic.id)]?.epochLength ?? '…'} blocks • {topicsSummary?.[String(topic.id)]?.isActive ? 'Active' : 'Inactive'}
                             </p>
                           </div>
                           {selectedTopicId === topic.id && (

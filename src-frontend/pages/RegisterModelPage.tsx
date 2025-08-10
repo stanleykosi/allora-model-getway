@@ -97,8 +97,21 @@ export default function RegisterModelPage() {
 
   const mutation = useMutation({
     mutationFn: registerModel,
-    onSuccess: (data) => {
-      toast.success('Model registered successfully!');
+    onSuccess: (data: ModelRegistrationResponse) => {
+      const tx = data?.registrationTxHash;
+      if (tx) {
+        const url = `https://testnet.allora.explorers.guru/transaction/${tx}`;
+        toast(() => (
+          <div className="text-sm">
+            <div className="font-semibold mb-1">Model registered successfully</div>
+            <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+              View transaction
+            </a>
+          </div>
+        ));
+      } else {
+        toast.success('Model registered successfully!');
+      }
       console.log('Registration successful:', data);
       navigate('/dashboard');
     },

@@ -201,6 +201,31 @@ class AlloraConnectorService {
   }
 
   /**
+   * Fetch the chain registration fee (uallo) from emissions params.
+   * Tries v9..v5 endpoints for compatibility.
+   */
+  public async getRegistrationFeeUallo(): Promise<number | null> {
+    const versions = ['v9', 'v8', 'v7', 'v6', 'v5'];
+    for (let i = 0; i < this.apiNodes.length; i++) {
+      const apiUrl = this.getCurrentApiNode();
+      for (const v of versions) {
+        try {
+          const res = await this.apiClient.get(`${apiUrl}/emissions/${v}/params`);
+          const feeStr = res.data?.params?.registration_fee ?? res.data?.registration_fee;
+          if (feeStr != null) {
+            const parsed = parseInt(String(feeStr), 10);
+            if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+          }
+        } catch (_e) {
+          // try next version or node
+        }
+      }
+      this.switchToNextApiNode();
+    }
+    return null;
+  }
+
+  /**
    * Parses a coin string (e.g., "1000uallo") into a Coin object.
    * @param amountStr The string to parse.
    * @returns A Coin object or null if parsing fails.

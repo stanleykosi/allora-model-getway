@@ -106,6 +106,10 @@ const envSchema = z.object({
   JOB_RATE_MAX: z.coerce.number().int().positive().default(100),
   JOB_RATE_DURATION: z.coerce.number().int().positive().default(10000),
 
+  // Registration funding policy
+  // Safety multiplier applied to simulated registration fee when funding new wallets
+  REG_FEE_SAFETY_MULTIPLIER: z.coerce.number().positive().default(1.3),
+
   // Preflight balance and auto-top-up
   ENABLE_PREFLIGHT_BALANCE_CHECK: z.coerce.boolean().default(true),
   MIN_WALLET_BALANCE_UALLO: z.coerce.number().int().nonnegative().default(20000),

@@ -26,6 +26,7 @@ export interface ModelRegistrationData {
 export interface ModelRegistrationResponse {
   modelId: string;
   walletAddress: string;
+  registrationTxHash?: string;
   costsIncurred: {
     registrationFee: string;
     initialFunding: string;
