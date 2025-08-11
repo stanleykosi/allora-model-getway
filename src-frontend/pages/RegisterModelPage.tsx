@@ -19,7 +19,6 @@ import {
   TrendingUp,
   Clock,
   DollarSign,
-  Info,
   Lock,
   Eye,
   EyeOff,
@@ -57,7 +56,6 @@ export default function RegisterModelPage() {
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const [isModelTypeDropdownOpen, setIsModelTypeDropdownOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [webhookValidation, setWebhookValidation] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
   const [copied, setCopied] = useState(false);
 
@@ -430,14 +428,14 @@ export default function RegisterModelPage() {
                     {/* Webhook URL */}
                     <div className="space-y-4">
                       <div className="relative">
-                        <label className="block text-sm font-semibold text-text-primary mb-3">
+                        <label className="block text-sm font-semibold text-text-primary mb-2">
                           Webhook URL <span className="text-error">*</span>
                         </label>
                         <div className="relative">
                           <Input
                             type="url"
                             placeholder="https://your-model-endpoint.com/webhook"
-                            className={`h-14 text-base pl-12 pr-12 rounded-xl border-2 transition-all duration-300 ${webhookValidation === 'valid'
+                            className={`h-14 text-base pl-4 pr-12 rounded-xl border-2 transition-all duration-300 ${webhookValidation === 'valid'
                               ? 'border-green-500/50 bg-green-500/5 focus:border-green-500'
                               : webhookValidation === 'invalid'
                                 ? 'border-error/50 bg-error/5 focus:border-error'
@@ -445,7 +443,7 @@ export default function RegisterModelPage() {
                               }`}
                             {...register('webhook_url')}
                           />
-                          <Globe className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-text-secondary" />
+                          {/* Removed globe icon inside input */}
                           <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
                             {webhookValidation === 'validating' && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
                             {webhookValidation === 'valid' && <CheckCircle className="h-5 w-5 text-green-500" />}
@@ -453,62 +451,25 @@ export default function RegisterModelPage() {
                           </div>
                         </div>
 
-                        {/* Example */}
-                        <div className="mt-3 p-4 bg-surface/50 rounded-xl border border-border/30">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-text-primary">Example URL:</p>
-                              <code className="text-sm text-text-secondary">https://your-model-endpoint.com/webhook</code>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleCopyExample}
-                              className="h-8 px-3"
-                            >
-                              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                            </Button>
-                          </div>
+                        {/* Example (compact helper) */}
+                        <div className="mt-2 flex items-center justify-between text-xs text-text-secondary">
+                          <div className="font-mono truncate pr-3">Example: https://your-model-endpoint.com/webhook</div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCopyExample}
+                            className="h-7 px-2"
+                            aria-label="Copy example URL"
+                          >
+                            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                          </Button>
                         </div>
                       </div>
                       {errors.webhook_url && (
                         <div className="flex items-center gap-3 p-4 bg-error/10 border border-error/20 rounded-xl">
                           <AlertCircle className="h-5 w-5 text-error flex-shrink-0" />
                           <span className="text-error font-medium">{errors.webhook_url.message}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Advanced Settings */}
-                    <div className="mt-8">
-                      <button
-                        type="button"
-                        onClick={() => setShowAdvanced(!showAdvanced)}
-                        className="flex items-center gap-2 text-text-secondary hover:text-primary transition-colors"
-                      >
-                        <Settings className="h-4 w-4" />
-                        <span className="text-sm font-medium">Advanced Settings</span>
-                        <ChevronDown className={`h-4 w-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-                      </button>
-
-                      {showAdvanced && (
-                        <div className="mt-4 p-6 bg-surface/30 rounded-xl border border-border/30">
-                          <div className="space-y-4">
-                            <label className="block text-sm font-semibold text-text-primary">
-                              Max Gas Price (Optional)
-                            </label>
-                            <Input
-                              type="text"
-                              placeholder="5000000000"
-                              className="h-12 rounded-xl border-2 border-border hover:border-primary/50 focus:border-primary bg-surface"
-                              {...register('max_gas_price')}
-                            />
-                            <p className="text-xs text-text-secondary flex items-center gap-2">
-                              <Info className="h-3 w-3" />
-                              Maximum gas price in wei. Leave empty for automatic optimization.
-                            </p>
-                          </div>
                         </div>
                       )}
                     </div>

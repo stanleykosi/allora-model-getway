@@ -17,3 +17,4 @@ CREATE INDEX IF NOT EXISTS submissions_topic_idx ON submissions (topic_id);
 CREATE INDEX IF NOT EXISTS submissions_created_at_idx ON submissions (created_at DESC);
 
 
+
