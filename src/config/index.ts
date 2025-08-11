@@ -69,7 +69,19 @@ const envSchema = z.object({
   // CORS Configuration
   ALLOWED_ORIGINS: z.string().optional(),
 
-  // Railway Configuration
+  // Preflight balance and auto-top-up
+  ENABLE_PREFLIGHT_BALANCE_CHECK: z.coerce.boolean().default(true),
+  MIN_WALLET_BALANCE_UALLO: z.coerce.number().int().nonnegative().default(20000),
+  TOPUP_AMOUNT_UALLO: z.coerce.number().int().positive().default(50000),
+
+  // Metrics protection
+  METRICS_TOKEN: z.string().optional(),
+
+  // Testing and development scripts
+  WORKER_MNEMONIC: z.string().optional(),
+  MODEL_ID: z.string().optional(),
+
+  // Railway deployment
   RAILWAY_PUBLIC_DOMAIN: z.string().optional(),
 
   // Rate Limiting Configuration
@@ -109,14 +121,6 @@ const envSchema = z.object({
   // Registration funding policy
   // Safety multiplier applied to simulated registration fee when funding new wallets
   REG_FEE_SAFETY_MULTIPLIER: z.coerce.number().positive().default(1.3),
-
-  // Preflight balance and auto-top-up
-  ENABLE_PREFLIGHT_BALANCE_CHECK: z.coerce.boolean().default(true),
-  MIN_WALLET_BALANCE_UALLO: z.coerce.number().int().nonnegative().default(20000),
-  TOPUP_AMOUNT_UALLO: z.coerce.number().int().positive().default(50000),
-
-  // Metrics protection
-  METRICS_TOKEN: z.string().optional(),
 });
 
 /**

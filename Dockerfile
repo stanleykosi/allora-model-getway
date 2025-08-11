@@ -1,6 +1,9 @@
 # Use Node.js 22 Alpine for production (required for all packages)
 FROM node:22-alpine
 
+# Install curl for health checks
+RUN apk add --no-cache curl
+
 # Set working directory
 WORKDIR /app
 
@@ -13,8 +16,6 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-
-
 # Build the application (backend + frontend)
 RUN npm run build:full
 
@@ -22,6 +23,7 @@ RUN npm run build:full
 RUN ls -la dist/ && ls -la dist-frontend/ && echo "✅ Build verification complete"
 
 # Remove dev dependencies after build to reduce image size
+# But keep @bufbuild/protobuf which is needed at runtime
 RUN npm ci --only=production && npm cache clean --force
 
 # Verify static files are still there after cleanup
@@ -34,5 +36,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-# Start the application
+# Start the application using the serve script (not start which requires pino-pretty)
 CMD ["npm", "run", "serve"] 
