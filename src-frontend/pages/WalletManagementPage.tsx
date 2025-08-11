@@ -22,6 +22,7 @@ import { useApi } from '@/hooks/useApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { copyToClipboard } from '@/lib/utils';
+import { DevelopmentWarning } from '@/components/ui/DevelopmentWarning';
 import AlloraIcon from '../components/icons/AlloraIcon';
 
 export default function WalletManagementPage() {
@@ -117,6 +118,9 @@ export default function WalletManagementPage() {
             Manage your wallet credentials, view balances, and track your model performance.
           </p>
         </div>
+
+        {/* Development Warning */}
+        <DevelopmentWarning />
 
         {/* Top Row - Quick Actions */}
         <div className="mb-8">

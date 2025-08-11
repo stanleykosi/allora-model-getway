@@ -37,6 +37,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/Input';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import AlloraIcon from '../components/icons/AlloraIcon';
+import { DevelopmentWarning } from '@/components/ui/DevelopmentWarning';
 
 // New Zod schema
 const registerModelSchema = z.object({
@@ -227,6 +228,8 @@ export default function RegisterModelPage() {
           </div>
         </div>
       </div>
+
+      <DevelopmentWarning />
 
       <div className="max-w-full mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8">
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 sm:gap-8">

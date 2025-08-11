@@ -405,7 +405,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <h3 className="text-lg sm:text-xl font-bold text-text-primary">Model Gateway</h3>
-                <p className="text-xs sm:text-sm text-text-secondary">&copy; {new Date().getFullYear()} Allora. All rights reserved.</p>
+                <p className="text-xs sm:text-sm text-text-secondary">&copy; {new Date().getFullYear()} Model Gateway. All rights reserved.</p>
               </div>
             </div>
             <div className="flex items-center gap-4 sm:gap-6 mt-4 md:mt-0">
