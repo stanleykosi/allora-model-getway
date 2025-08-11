@@ -23,7 +23,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         <div className="flex items-start justify-between">
           <h2 className="text-lg sm:text-xl font-bold text-text-primary">{title}</h2>
           <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
-            <X size={20} className="h-5 w-5 sm:h-6 sm:w-6" />
+            <X size={20} className="h-5 w-5" />
           </button>
         </div>
         <div className="mt-3 sm:mt-4">

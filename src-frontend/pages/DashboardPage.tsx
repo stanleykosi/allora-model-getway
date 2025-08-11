@@ -113,15 +113,11 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-text-primary mb-1 sm:mb-2">
-                  Welcome back, {user?.firstName || 'User'}! 👋
+                  Welcome back, {user?.firstName || 'User'}!
                 </h2>
                 <p className="text-sm sm:text-base text-text-secondary md:text-lg">
                   Manage your models, monitor network activity, and track your performance across the Allora Network.
                 </p>
-              </div>
-              <div className="text-center md:text-right mt-3 sm:mt-4 md:mt-0">
-                <div className="text-2xl sm:text-3xl font-bold text-primary">{models.length}</div>
-                <div className="text-xs sm:text-sm text-text-secondary">Total Models</div>
               </div>
             </div>
           </CardContent>
@@ -308,7 +304,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <Link to={`/models/${model.id}`} className="w-full sm:w-auto">
-                      <Button variant="outline" size="sm" className="group-hover:bg-primary group-hover:text-white transition-all w-full">
+                      <Button variant="outline" size="sm" className="group-hover:bg-primary group-hover:text-white transition-all w-full h-8 px-3">
                         View Details
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>

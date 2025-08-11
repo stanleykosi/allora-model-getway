@@ -27,14 +27,14 @@ export default function NotFoundPage() {
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center px-4 sm:px-0">
           <Link to="/dashboard" className="w-full sm:w-auto">
-            <Button className="bg-primary hover:bg-primary/90 w-full text-sm sm:text-base py-1.5 sm:py-2 h-auto">
-              <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+            <Button className="bg-primary hover:bg-primary/90 w-full text-sm sm:text-base h-10 px-4">
+              <Home className="h-4 w-4 mr-2" />
               Go to Dashboard
             </Button>
           </Link>
           <Link to="/" className="w-full sm:w-auto">
-            <Button variant="outline" className="w-full text-sm sm:text-base py-1.5 sm:py-2 h-auto">
-              <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+            <Button variant="outline" className="w-full text-sm sm:text-base h-10 px-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Home
             </Button>
           </Link>

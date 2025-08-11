@@ -16,3 +16,15 @@ body,
 .page-content {
   max-width: 100vw;
 }
+
+/* Additional overflow protection for sidebar states */
+.main-content {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+/* Ensure progress indicators don't overflow */
+.progress-container {
+  overflow-x: hidden;
+  max-width: 100%;
+}

@@ -4,18 +4,15 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import {
   Wallet,
-  User,
   Copy,
   Eye,
   EyeOff,
   Target,
   Zap,
-  Network,
   ArrowRight,
   Loader2,
   AlertCircle,
   CheckCircle,
-  BarChart3,
   Plus,
   Shield,
   CreditCard
@@ -35,18 +32,6 @@ export default function WalletManagementPage() {
   const api = useApi();
 
   // API functions
-  const fetchUserProfile = async (): Promise<any> => {
-    console.log('📊 Fetching user profile...');
-    try {
-      const { data } = await api.get('/api/v1/users/profile');
-      console.log('✅ User profile fetched successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('❌ Failed to fetch user profile:', error);
-      throw error;
-    }
-  };
-
   const fetchUserModels = async (): Promise<any> => {
     console.log('📊 Fetching user models...');
     try {
@@ -72,11 +57,6 @@ export default function WalletManagementPage() {
   };
 
   // Queries
-  const { data: userProfile, isLoading: isLoadingProfile } = useQuery({
-    queryKey: ['userProfile'],
-    queryFn: fetchUserProfile,
-  });
-
   const { data: userModels, isLoading: isLoadingModels } = useQuery({
     queryKey: ['userModels'],
     queryFn: fetchUserModels,
@@ -104,7 +84,7 @@ export default function WalletManagementPage() {
     }));
   };
 
-  if (isLoadingProfile || isLoadingModels || isLoadingWallets) {
+  if (isLoadingModels || isLoadingWallets) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-surface/20 flex items-center justify-center">
         <div className="text-center">
@@ -138,115 +118,70 @@ export default function WalletManagementPage() {
           </p>
         </div>
 
-        {/* Top Row - User Profile & Account Overview */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* User Profile */}
+        {/* Top Row - Quick Actions */}
+        <div className="mb-8">
           <Card className="border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
             <CardHeader className="pb-4 sm:pb-6">
               <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-accent/20 rounded-md sm:rounded-lg flex items-center justify-center">
-                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                  <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg sm:text-xl md:text-2xl">User Profile</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl md:text-2xl">Quick Actions</CardTitle>
                   <CardDescription className="text-xs sm:text-sm md:text-base">
-                    Your account information and details
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3 sm:space-y-4">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl sm:rounded-2xl flex items-center justify-center">
-                  <User className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-base sm:text-lg md:text-xl font-semibold text-text-primary">
-                    {user?.firstName} {user?.lastName}
-                  </h3>
-                  <p className="text-sm sm:text-base text-text-secondary">{user?.emailAddresses?.[0]?.emailAddress}</p>
-                  <p className="text-xs text-text-secondary mt-0.5 sm:mt-1">
-                    User ID: {user?.id}
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 pt-2 sm:pt-4">
-                <div className="p-2 sm:p-3 bg-surface/50 rounded-lg">
-                  <p className="text-xs text-text-secondary">Created</p>
-                  <p className="text-sm sm:text-base font-medium text-text-primary">
-                    {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-                  </p>
-                </div>
-                <div className="p-2 sm:p-3 bg-surface/50 rounded-lg">
-                  <p className="text-xs text-text-secondary">Last Sign In</p>
-                  <p className="text-sm sm:text-base font-medium text-text-primary">
-                    {user?.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'N/A'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Account Overview */}
-          <Card className="border-0 shadow-2xl bg-surface/50 backdrop-blur-sm">
-            <CardHeader className="pb-4 sm:pb-6">
-              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-accent/20 to-accent/10 rounded-md sm:rounded-lg flex items-center justify-center">
-                  <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg sm:text-xl md:text-2xl">Account Overview</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm md:text-base">
-                    Your model and wallet statistics
+                    Manage your wallets and models efficiently
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="p-3 sm:p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg sm:rounded-xl">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary/20 rounded-md sm:rounded-lg flex items-center justify-center">
-                      <Target className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Link to="/models/register">
+                  <div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg hover:from-primary/20 hover:to-primary/10 transition-all duration-200 cursor-pointer group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                        <Plus className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-text-primary">Register Model</p>
+                        <p className="text-xs text-text-secondary">Create new model & wallet</p>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+
+                <div className="p-4 bg-gradient-to-br from-accent/10 to-accent/5 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-accent/20 rounded-lg flex items-center justify-center">
+                      <Target className="h-5 w-5 text-accent" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-medium text-text-secondary">Registered Models</p>
-                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary">{models.length}</p>
+                      <p className="font-medium text-text-primary">{models.length}</p>
+                      <p className="text-xs text-text-secondary">Total Models</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-3 sm:p-4 bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-lg sm:rounded-xl">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-500/20 rounded-md sm:rounded-lg flex items-center justify-center">
-                      <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+
+                <div className="p-4 bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                      <Zap className="h-5 w-5 text-green-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-medium text-text-secondary">Active Models</p>
-                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-500">{activeModels.length}</p>
+                      <p className="font-medium text-text-primary">{activeModels.length}</p>
+                      <p className="text-xs text-text-secondary">Active Models</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-3 sm:p-4 bg-gradient-to-br from-accent/10 to-accent/5 rounded-lg sm:rounded-xl">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-accent/20 rounded-md sm:rounded-lg flex items-center justify-center">
-                      <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-accent" />
+
+                <div className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                      <Wallet className="h-5 w-5 text-purple-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-medium text-text-secondary">Total Wallets</p>
-                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-accent">{wallets.length}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-3 sm:p-4 bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-lg sm:rounded-xl">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-500/20 rounded-md sm:rounded-lg flex items-center justify-center">
-                      <Network className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500" />
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm font-medium text-text-secondary">Topics</p>
-                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-500">
-                        {new Set(models.map((m: any) => m.topic_id)).size}
-                      </p>
+                      <p className="font-medium text-text-primary">{wallets.length}</p>
+                      <p className="text-xs text-text-secondary">Total Wallets</p>
                     </div>
                   </div>
                 </div>

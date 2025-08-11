@@ -126,10 +126,7 @@ export default function ModelDetailPage() {
 
       {/* Performance Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        <Card className="relative overflow-hidden border-0 shadow-xl bg-surface/50 backdrop-blur-sm">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg">
-            <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-          </div>
+        <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-blue-500 to-cyan-500 backdrop-blur-sm">
           <CardContent className="relative p-4 sm:p-6">
             <div className="flex items-center gap-3 sm:gap-4">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg">

@@ -168,11 +168,11 @@ export default function RegisterModelPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-surface/10">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-surface/10 overflow-x-hidden">
       {/* Header Section */}
       <div className="relative overflow-hidden bg-gradient-to-r from-surface/50 via-surface/30 to-surface/50 backdrop-blur-xl border-b border-border/20">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5" />
-        <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-12">
+        <div className="relative max-w-full mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-12">
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-gradient-to-br from-green-500/20 via-green-500/10 to-emerald-500/20 rounded-xl sm:rounded-2xl mb-3 sm:mb-4 md:mb-6 shadow-2xl shadow-green-500/10">
               <PlusCircle className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 text-green-500" />
@@ -185,15 +185,15 @@ export default function RegisterModelPage() {
             </p>
 
             {/* Progress Indicator */}
-            <div className="flex items-center justify-center mt-6 sm:mt-8 mb-3 sm:mb-4 overflow-x-auto pb-3 sm:pb-4">
-              <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
+            <div className="flex items-center justify-center mt-6 sm:mt-8 mb-3 sm:mb-4 overflow-hidden pb-3 sm:pb-4 w-full">
+              <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 lg:space-x-4 max-w-full px-2">
                 {steps.map((step, index) => {
                   const status = getStepStatus(step.number);
                   const Icon = step.icon;
 
                   return (
                     <div key={step.number} className="flex items-center">
-                      <div className="flex flex-col items-center text-center w-16 sm:w-24 md:w-32">
+                      <div className="flex flex-col items-center text-center w-12 sm:w-16 md:w-20 lg:w-24 xl:w-28">
                         <div className={`relative w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-300 ${status === 'completed'
                           ? 'bg-primary text-white shadow-lg shadow-primary/25'
                           : status === 'active'
@@ -216,7 +216,7 @@ export default function RegisterModelPage() {
                         </div>
                       </div>
                       {index < steps.length - 1 && (
-                        <div className={`w-4 sm:w-8 md:w-16 h-0.5 mx-1 sm:mx-2 md:mx-4 transition-colors duration-300 ${status === 'completed' ? 'bg-primary' : 'bg-border/30'
+                        <div className={`w-2 sm:w-4 md:w-8 lg:w-12 xl:w-16 h-0.5 mx-1 sm:mx-2 md:mx-3 lg:mx-4 transition-colors duration-300 ${status === 'completed' ? 'bg-primary' : 'bg-border/30'
                           }`} />
                       )}
                     </div>
@@ -228,7 +228,7 @@ export default function RegisterModelPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8">
+      <div className="max-w-full mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8">
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 sm:gap-8">
           {/* Main Registration Form */}
           <div className="xl:col-span-3">

@@ -201,29 +201,29 @@ export default function ManageModelsPage() {
               <Button
                 variant={statusFilter === 'all' ? 'default' : 'outline'}
                 onClick={() => setStatusFilter('all')}
-                className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-xs sm:text-sm py-1.5 sm:py-2 h-auto px-2 sm:px-3"
+                className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-xs sm:text-sm py-2 h-auto px-3"
               >
                 All
               </Button>
               <Button
                 variant={statusFilter === 'active' ? 'default' : 'outline'}
                 onClick={() => setStatusFilter('active')}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-500/90 hover:to-green-600/90 text-xs sm:text-sm py-1.5 sm:py-2 h-auto px-2 sm:px-3"
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-500/90 hover:to-green-600/90 text-xs sm:text-sm py-2 h-auto px-3"
               >
                 Active
               </Button>
               <Button
                 variant={statusFilter === 'inactive' ? 'default' : 'outline'}
                 onClick={() => setStatusFilter('inactive')}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-500/90 hover:to-purple-600/90 text-xs sm:text-sm py-1.5 sm:py-2 h-auto px-2 sm:px-3"
+                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-500/90 hover:to-purple-600/90 text-xs sm:text-sm py-2 h-auto px-3"
               >
                 Inactive
               </Button>
             </div>
           </div>
           <Link to="/models/register" className="w-full md:w-auto">
-            <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-10 sm:h-12 px-4 sm:px-6 w-full text-sm sm:text-base">
-              <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2" />
+            <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-10 px-6 w-full md:w-auto text-sm sm:text-base whitespace-nowrap">
+              <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               Register New Model
             </Button>
           </Link>
@@ -329,8 +329,8 @@ export default function ManageModelsPage() {
                 </p>
                 {!searchTerm && statusFilter === 'all' && (
                   <Link to="/models/register">
-                    <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-10 sm:h-12 px-6 sm:px-8 text-sm sm:text-base">
-                      <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2" />
+                    <Button className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 h-10 px-6 text-sm sm:text-base">
+                      <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                       Register Your First Model
                     </Button>
                   </Link>
@@ -403,7 +403,7 @@ export default function ManageModelsPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleViewPerformance(model)}
-                              className="hover:bg-primary hover:text-white transition-all"
+                              className="h-8 px-3 hover:bg-primary hover:text-white transition-all"
                             >
                               <Eye className="h-4 w-4" />
                               <span className="hidden sm:inline ml-1">View</span>
@@ -413,7 +413,7 @@ export default function ManageModelsPage() {
                               size="sm"
                               onClick={() => handleStatusToggle(model)}
                               disabled={activateMutation.isPending || deactivateMutation.isPending}
-                              className={`${model.is_active
+                              className={`h-8 px-3 ${model.is_active
                                 ? 'hover:bg-red-500 hover:text-white'
                                 : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-500/90 hover:to-green-600/90'
                                 } transition-all`}
